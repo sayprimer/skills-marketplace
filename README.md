@@ -42,9 +42,9 @@ ln -s "$PWD/skills-marketplace/.agents/skills/build-audiences" \
 
 | What | Env var | Notes |
 |------|---------|-------|
-| API key | `PRIMER_API_KEY` | Secret, prefixed `ak_`. Never commit it. |
+| API key | `PRIMER_API_KEY` | Secret, prefixed `ak_`. Never commit it. **The only thing you have to set.** |
 | Ingest API key | `PRIMER_INGEST_API_KEY` | Optional; falls back to `PRIMER_API_KEY`. |
-| API host | `PRIMER_API_BASE_URL` | Required — no baked-in default. |
+| API host | `PRIMER_API_BASE_URL` | Optional; defaults to Primer's production host. Set it only for a dedicated or regional deployment. |
 
 The CLI is stdlib-only Python 3.8+ — no install, no third-party dependencies.
 Every write verb supports `--dry-run`, which prints the exact request (with the
