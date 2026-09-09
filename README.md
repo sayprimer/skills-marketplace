@@ -53,6 +53,61 @@ key redacted) and sends nothing.
 See the skill's `reference/` directory for the endpoint contract, configuration
 detail, and an ICP template.
 
+## Staying up to date
+
+Each release bumps the plugin's `version`, which is what clients compare to
+decide whether you need an update. How you receive it depends on your client.
+
+**Claude Code.** Third-party marketplaces have background auto-update **off by
+default**, so turn it on once:
+
+```
+/plugin  →  Marketplaces  →  sayprimer  →  Enable auto-update
+```
+
+With it on, Claude Code refreshes shortly after a session starts and prompts
+you to run `/reload-plugins` (the running session keeps the version it loaded
+at launch). To update on demand instead:
+
+```
+/plugin marketplace update sayprimer
+/reload-plugins
+```
+
+Installing by full name also refreshes the catalog first, even with
+auto-update off:
+
+```
+/plugin install primer-targeting@sayprimer
+```
+
+**Teams and organizations.** An admin can enable auto-update for everyone
+without each person toggling it, by declaring the marketplace in a project's
+`.claude/settings.json` or in managed settings:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "sayprimer": {
+      "source": { "source": "github", "repo": "sayprimer/skills-marketplace" },
+      "autoUpdate": true
+    }
+  }
+}
+```
+
+**Claude Cowork.** An org owner connects this repo under Organization settings
+→ Plugins → Add plugin → GitHub, and Cowork syncs from it.
+
+**Known limitation.** Claude Code currently skips background plugin
+auto-updates on Homebrew and other package-manager installs even when
+`autoUpdate` is true — see
+<https://github.com/anthropics/claude-code/issues/86139> (open as of
+September 2026). If you installed that way, use the manual
+`/plugin marketplace update sayprimer` above. Background updates are also
+skipped when `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` or
+`DISABLE_AUTOUPDATER` is set.
+
 ## Contributing
 
 This repo is **generated** from Primer's internal source of truth and published
