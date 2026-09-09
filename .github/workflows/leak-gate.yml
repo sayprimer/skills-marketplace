@@ -83,4 +83,4 @@ jobs:
           PY
 
       - name: CLI smoke test
-        run: python3 plugins/primer-targeting/skills/build-audiences/bin/primer-audience --help
+        run: python3 plugins/primer-targeting/skills/build-audiences/bin/primer --help

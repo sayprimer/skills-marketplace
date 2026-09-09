@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""primer-audience — thin CLI over the Primer audience + ingest API-key endpoints.
+"""primer — thin CLI over the Primer audience + ingest API-key endpoints.
 
 Stdlib-only (Python 3.8+). No install, no third-party deps. Drives the audience
 API-key endpoints and the HTTP dataset-ingest endpoints described in
@@ -583,7 +583,7 @@ def build_title_audit(est):
 
 def build_parser():
     p = argparse.ArgumentParser(
-        prog="primer-audience",
+        prog="primer",
         description="Thin CLI over the Primer audience API-key endpoints. "
                     "Set PRIMER_API_KEY (ak_…) and PRIMER_API_BASE_URL, or "
                     "pass --api-key/--base-url.")

@@ -1,7 +1,7 @@
 {
   "name": "primer-targeting",
-  "version": "1.0.0",
-  "description": "Build and refine a Primer audience from an ICP: translate the profile into filter criteria, then create, shape, estimate, and audit the audience through the bundled primer-audience CLI until it matches. Requires a revocable Primer API key.",
+  "version": "2.0.0",
+  "description": "Build and refine a Primer audience from an ICP: translate the profile into filter criteria, then create, shape, estimate, and audit the audience through the bundled primer CLI until it matches. Requires a revocable Primer API key.",
   "author": {
     "name": "Primer",
     "url": "https://github.com/sayprimer"

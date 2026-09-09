@@ -1,7 +1,7 @@
 # Audience API-key contract
 
 The endpoint reference for the Primer audience API-key surface that the
-`build-audiences` skill and its `bin/primer-audience` CLI drive. The request
+`build-audiences` skill and its `bin/primer` CLI drive. The request
 shapes, parameters, and limits below are what the CLI sends.
 
 ## Auth
