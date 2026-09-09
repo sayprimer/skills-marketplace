@@ -125,5 +125,5 @@ skipped when `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` or
 
 This repo is **generated** from Primer's internal source of truth and published
 as sanitized snapshots — direct edits here are overwritten on the next publish.
-Please open an issue rather than a pull request; accepted changes are made
-upstream and land in the following release.
+Please open an issue rather than a pull request. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for why, and how a change reaches you.
