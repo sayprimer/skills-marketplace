@@ -10,7 +10,7 @@ install). Everything below is what the CLI needs to reach the API.
 |------|---------|----------|-------|
 | API key | `PRIMER_API_KEY` | `--api-key` | Revocable Clerk key, secret, prefixed `ak_`. Sent as `Authorization: Bearer <key>`. **Never** paste it into chat or commit it. |
 | Ingest API key | `PRIMER_INGEST_API_KEY` | `--ingest-api-key` | Optional. Used by the `ingest` verb only; falls back to the audience key above if unset. See the two-key note below. |
-| Base URL | `PRIMER_API_BASE_URL` | `--base-url` | Environment root, no trailing path. **Required** — there is no baked-in default (the host is environment-specific). |
+| Base URL | `PRIMER_API_BASE_URL` | `--base-url` | Environment root, no trailing path. **Optional** — defaults to Primer's multi-tenant production host. Set it only for a dedicated/regional deployment or another environment. |
 
 ### Two keys, two limiters
 
@@ -29,22 +29,22 @@ issues a distinct ingest key, put it in `PRIMER_INGEST_API_KEY` (or pass
 also enforces **50k records / 10 MB** per request (the CLI auto-splits by
 record count); `429` means back off, `413` means the batch was too big.
 
-Export once per shell:
+Export once per shell — the key is all you need against production:
 
 ```bash
 export PRIMER_API_KEY="ak_…" # provided out-of-band; keep it secret
-export PRIMER_API_BASE_URL="https://primer-platform.api.sayprimer.com"
 ```
 
 The CLI redacts the key in all `--dry-run` output (`Bearer ak_tes…7890`).
 
 ## Environments
 
-Set `PRIMER_API_BASE_URL` to your Primer API host:
+Resolution order is `--base-url` > `PRIMER_API_BASE_URL` > the built-in
+default, so you only set this to reach something other than production:
 
 | Environment | `PRIMER_API_BASE_URL` | Notes |
 |-------------|-----------------------|-------|
-| Production | `https://primer-platform.api.sayprimer.com` | Your Primer API host. |
+| Production | `https://primer-platform.api.sayprimer.com` | **The default** — nothing to set. |
 
 ## conversation_id policy
 

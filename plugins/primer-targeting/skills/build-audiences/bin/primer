@@ -15,7 +15,8 @@ dataset reads (`datasets`, `dataset-get`) remain.
 
 Auth: a revocable Clerk API key (secret, prefixed `ak_`) sent as
 `Authorization: Bearer <key>`. Read from `--api-key` or the
-`PRIMER_API_KEY` env var. Base URL from `--base-url` or `PRIMER_API_BASE_URL`.
+`PRIMER_API_KEY` env var. Base URL from `--base-url` or `PRIMER_API_BASE_URL`,
+falling back to Primer's production host.
 Ingest is rate-limited separately from the audience endpoints, so the ingest
 key may be a distinct `ak_`; the `ingest` verb prefers `--ingest-api-key` /
 `PRIMER_INGEST_API_KEY` and falls back to the shared key.
@@ -37,8 +38,11 @@ import urllib.parse
 import urllib.request
 
 DEFAULT_TIMEOUT = 60
-# No baked-in default host — the base URL is environment-specific and must be
-# supplied per deployment (env PRIMER_API_BASE_URL or --base-url).
+# Primer's multi-tenant production host, used when nothing overrides it.
+# Resolution order is --base-url > PRIMER_API_BASE_URL > this default, so a
+# dedicated/regional deployment (or internal validation against another
+# environment) still points the CLI wherever it needs to go.
+DEFAULT_BASE_URL = "https://primer-platform.api.sayprimer.com"
 
 # fieldId enum shared by /filters/field-values and /filters/find-values.
 FIELD_IDS = [
@@ -81,10 +85,11 @@ def _redact(key):
 
 def compose(method, base_url, path, query=None, body=None, api_key=None):
     """Build a request description dict (what --dry-run prints and send() uses)."""
+    # Only reachable if something explicitly blanks it (e.g. --base-url "").
     if not base_url:
-        raise ApiError("no base URL — set PRIMER_API_BASE_URL or pass "
-                       "--base-url before the subcommand (your Primer API "
-                       "host; there is no default).")
+        raise ApiError("empty base URL — unset PRIMER_API_BASE_URL to fall "
+                       "back to %s, or pass a host with --base-url."
+                       % DEFAULT_BASE_URL)
     url = base_url.rstrip("/") + path
     if query:
         # drop None values; everything else stringified.
@@ -585,11 +590,13 @@ def build_parser():
     p = argparse.ArgumentParser(
         prog="primer",
         description="Thin CLI over the Primer audience API-key endpoints. "
-                    "Set PRIMER_API_KEY (ak_…) and PRIMER_API_BASE_URL, or "
-                    "pass --api-key/--base-url.")
+                    "Set PRIMER_API_KEY (ak_…); the API host defaults to "
+                    "Primer production unless you override it.")
     p.add_argument("--base-url",
-                   default=os.environ.get("PRIMER_API_BASE_URL"),
-                   help="API base URL (env PRIMER_API_BASE_URL). Required.")
+                   default=os.environ.get("PRIMER_API_BASE_URL")
+                           or DEFAULT_BASE_URL,
+                   help="API base URL (env PRIMER_API_BASE_URL). Defaults to "
+                        "%s." % DEFAULT_BASE_URL)
     p.add_argument("--api-key", default=os.environ.get("PRIMER_API_KEY"),
                    help="Revocable Clerk API key, ak_… (env PRIMER_API_KEY).")
     p.add_argument("--dry-run", action="store_true",
