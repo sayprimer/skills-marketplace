@@ -1,0 +1,748 @@
+#!/usr/bin/env python3
+"""primer — thin CLI over the Primer audience + ingest API-key endpoints.
+
+Stdlib-only (Python 3.8+). No install, no third-party deps. Drives the audience
+API-key endpoints and the HTTP dataset-ingest endpoints described in
+`reference/api-contract.md`, which is generated from the authoritative contract. This CLI is the mechanical transport the `build-audiences` skill
+drives; all judgment lives in the skill.
+
+Getting rows into Primer goes through the continuously-updatable `ingest` verb
+(`POST /ingest/{people|companies}`): pushing the same `dataset` name again
+upserts by stable id in place — that is the refresh affordance. The static
+one-time CSV upload path (`POST /imported-datasets` → presigned upload →
+`/import`) is intentionally NOT exposed by this CLI; only the origin-agnostic
+dataset reads (`datasets`, `dataset-get`) remain.
+
+Auth: a revocable Clerk API key (secret, prefixed `ak_`) sent as
+`Authorization: Bearer <key>`. Read from `--api-key` or the
+`PRIMER_API_KEY` env var. Base URL from `--base-url` or `PRIMER_API_BASE_URL`.
+Ingest is rate-limited separately from the audience endpoints, so the ingest
+key may be a distinct `ak_`; the `ingest` verb prefers `--ingest-api-key` /
+`PRIMER_INGEST_API_KEY` and falls back to the shared key.
+
+Policy: `conversation_id` is CLIENT-SIDE ONLY. It is never sent on `create`
+or `shape`. There is no server-side conversation stitching.
+
+Every write command supports `--dry-run`: it composes and prints the exact
+request (method, URL, redacted headers, JSON body) and sends nothing.
+"""
+
+import argparse
+import json
+import os
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+
+DEFAULT_TIMEOUT = 60
+# No baked-in default host — the base URL is environment-specific and must be
+# supplied per deployment (env PRIMER_API_BASE_URL or --base-url).
+
+# fieldId enum shared by /filters/field-values and /filters/find-values.
+FIELD_IDS = [
+    "person_location", "company_location", "domain", "industry", "keywords",
+    "technologies", "departments", "job_title", "seniority", "annual_revenue",
+    "founded_year", "headcount", "csv", "naics_code", "skills", "majors",
+    "degrees",
+]
+ENTITY_TYPES = ["company", "person"]
+# Ad/export destinations. `destinations` is a JSON OBJECT of booleans, not an
+# array.
+DESTINATION_KEYS = [
+    "meta", "google", "linkedIn", "reddit", "dv360", "salesforce", "csv",
+]
+PREVIEW_OFFSET_MAX = 225 # value cap on estimate/preview offset.
+
+# Ingest (POST /ingest/{people|companies}). Server limits per request: 50k
+# records / 10 MB body; 600 req/min per org. `dataset` must not contain the
+# reserved `-batch-` marker (the server uses it for its own batch suffixes).
+INGEST_ENTITIES = ["people", "companies"]
+INGEST_MAX_RECORDS = 50000
+INGEST_BATCH_MARKER = "-batch-"
+
+
+class ApiError(Exception):
+    pass
+
+
+# --------------------------------------------------------------------------- #
+# request plumbing
+# --------------------------------------------------------------------------- #
+
+def _redact(key):
+    if not key:
+        return "<missing>"
+    if len(key) <= 8:
+        return "ak_****"
+    return key[:6] + "…" + key[-4:]
+
+
+def compose(method, base_url, path, query=None, body=None, api_key=None):
+    """Build a request description dict (what --dry-run prints and send() uses)."""
+    if not base_url:
+        raise ApiError("no base URL — set PRIMER_API_BASE_URL or pass "
+                       "--base-url before the subcommand (your Primer API "
+                       "host; there is no default).")
+    url = base_url.rstrip("/") + path
+    if query:
+        # drop None values; everything else stringified.
+        clean = {k: v for k, v in query.items() if v is not None}
+        if clean:
+            url += "?" + urllib.parse.urlencode(clean, doseq=True)
+    headers = {
+        "Authorization": "Bearer " + (api_key or ""),
+        "Accept": "application/json",
+    }
+    if body is not None:
+        headers["Content-Type"] = "application/json"
+    return {"method": method, "url": url, "headers": headers, "body": body}
+
+
+def render_dry_run(req):
+    printable_headers = dict(req["headers"])
+    if "Authorization" in printable_headers:
+        token = printable_headers["Authorization"].split(" ", 1)[-1]
+        printable_headers["Authorization"] = "Bearer " + _redact(token)
+    lines = [
+        "DRY RUN — no request sent",
+        "%s %s" % (req["method"], req["url"]),
+    ]
+    for k, v in printable_headers.items():
+        lines.append("%s: %s" % (k, v))
+    if req["body"] is not None:
+        lines.append("")
+        lines.append(json.dumps(req["body"], indent=2, sort_keys=True))
+    return "\n".join(lines)
+
+
+def send(req, timeout=DEFAULT_TIMEOUT):
+    data = None
+    if req["body"] is not None:
+        data = json.dumps(req["body"]).encode("utf-8")
+    request = urllib.request.Request(
+        req["url"], data=data, headers=req["headers"], method=req["method"]
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as resp:
+            raw = resp.read().decode("utf-8") if resp.length != 0 else ""
+            status = resp.getcode()
+    except urllib.error.HTTPError as exc:
+        raw = exc.read().decode("utf-8", "replace")
+        try:
+            payload = json.loads(raw) if raw else None
+        except ValueError:
+            payload = raw
+        raise ApiError("HTTP %s on %s %s: %s"
+                       % (exc.code, req["method"], req["url"], payload))
+    except urllib.error.URLError as exc:
+        raise ApiError("connection error on %s %s: %s"
+                       % (req["method"], req["url"], exc.reason))
+    if status == 204 or not raw:
+        return {"_status": status}
+    try:
+        return json.loads(raw)
+    except ValueError:
+        return {"_status": status, "_raw": raw}
+
+
+def run(req, args):
+    """Dry-run or send, then emit. Returns the parsed response (or None)."""
+    if getattr(args, "dry_run", False):
+        print(render_dry_run(req))
+        return None
+    key = req["headers"].get("Authorization", "Bearer ").split(" ", 1)[-1]
+    if not key:
+        raise ApiError("no API key — set PRIMER_API_KEY or pass --api-key "
+                       "(a revocable Clerk key, prefixed ak_)")
+    resp = send(req, timeout=args.timeout)
+    emit(resp, args)
+    return resp
+
+
+def emit(obj, args):
+    if obj is None:
+        return
+    print(json.dumps(obj, indent=None if getattr(args, "compact", False) else 2))
+
+
+# --------------------------------------------------------------------------- #
+# body / arg helpers
+# --------------------------------------------------------------------------- #
+
+def load_json_arg(value, what):
+    """Accept an inline JSON string or @path/to/file.json."""
+    if value is None:
+        return None
+    if value.startswith("@"):
+        path = value[1:]
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                value = fh.read()
+        except OSError as exc:
+            raise ApiError("could not read %s from %s: %s" % (what, path, exc))
+    try:
+        return json.loads(value)
+    except ValueError as exc:
+        raise ApiError("invalid JSON for %s: %s" % (what, exc))
+
+
+def read_text_source(value, what):
+    """Return raw text from inline string, @path/to/file, or '-' (stdin)."""
+    if value == "-":
+        return sys.stdin.read()
+    if value.startswith("@"):
+        path = value[1:]
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                return fh.read()
+        except OSError as exc:
+            raise ApiError("could not read %s from %s: %s" % (what, path, exc))
+    return value
+
+
+def parse_destinations(pairs):
+    """['meta=true','csv=1'] -> {'meta': True, 'csv': True}."""
+    if not pairs:
+        return None
+    out = {}
+    for pair in pairs:
+        if "=" not in pair:
+            raise ApiError("--destination expects key=bool, got %r" % pair)
+        key, _, raw = pair.partition("=")
+        if key not in DESTINATION_KEYS:
+            raise ApiError("unknown destination %r (allowed: %s)"
+                           % (key, ", ".join(DESTINATION_KEYS)))
+        out[key] = raw.strip().lower() in ("1", "true", "yes", "on")
+    return out
+
+
+def strip_conversation_id(body, where):
+    """Enforce the client-side-only policy: conversation_id is never sent.
+
+    Recursive by design — the policy requires it on NO write, regardless of where a
+    caller placed it (top-level or nested in a hand-authored criteria blob).
+    """
+    dropped = [False]
+
+    def _walk(node):
+        if isinstance(node, dict):
+            if "conversation_id" in node:
+                del node["conversation_id"]
+                dropped[0] = True
+            for v in node.values():
+                _walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                _walk(v)
+
+    _walk(body)
+    if dropped[0]:
+        sys.stderr.write(
+            "note: dropped conversation_id from %s body — it is client-side "
+            "only and never sent to the server.\n" % where)
+    return body
+
+
+# --------------------------------------------------------------------------- #
+# commands
+# --------------------------------------------------------------------------- #
+
+def cmd_list_audiences(args):
+    query = {
+        "offset": args.offset, "limit": args.limit, "sort": args.sort,
+        "order": args.order, "name": args.name, "status": args.status,
+        "type": args.type,
+    }
+    req = compose("GET", args.base_url, "/audiences", query=query,
+                  api_key=args.api_key)
+    run(req, args)
+
+
+def _criteria_body(args):
+    """Assemble source_criteria from --body or convenience flags."""
+    body = load_json_arg(args.body, "request body") or {}
+    if args.name is not None:
+        body["name"] = args.name
+    if args.type is not None:
+        body["type"] = args.type
+    dests = parse_destinations(args.destination)
+    if dests is not None:
+        body["destinations"] = dests
+    criteria = load_json_arg(args.criteria, "source_criteria")
+    if criteria is not None:
+        # allow --target-entity-type to fill/override on a bare criteria object.
+        if args.target_entity_type and "target_entity_type" not in criteria:
+            criteria["target_entity_type"] = args.target_entity_type
+        body["source_criteria"] = criteria
+    return body
+
+
+def cmd_create(args):
+    body = _criteria_body(args)
+    body = strip_conversation_id(body, "create") # never sent
+    req = compose("POST", args.base_url, "/audiences", body=body,
+                  api_key=args.api_key)
+    run(req, args)
+
+
+def cmd_get(args):
+    req = compose("GET", args.base_url, "/audiences/%s" % args.audience_id,
+                  api_key=args.api_key)
+    run(req, args)
+
+
+def cmd_update(args):
+    body = load_json_arg(args.body, "request body") or {}
+    if args.name is not None:
+        body["name"] = args.name
+    dests = parse_destinations(args.destination)
+    if dests is not None:
+        body["destinations"] = dests
+    if "archived" in body:
+        # API-key callers must send destinations only; archived triggers an
+        # irreversible ad-audience clawback (contract note on PATCH /audiences).
+        raise ApiError("refusing to send `archived` on update — API-key "
+                       "callers may change destinations/name only; setting "
+                       "archived triggers an irreversible clawback.")
+    req = compose("PATCH", args.base_url, "/audiences/%s" % args.audience_id,
+                  body=body, api_key=args.api_key)
+    run(req, args)
+
+
+def cmd_shape(args):
+    body = load_json_arg(args.body, "request body") or {}
+    criteria = load_json_arg(args.criteria, "source_criteria")
+    if criteria is not None:
+        if args.target_entity_type and "target_entity_type" not in criteria:
+            criteria["target_entity_type"] = args.target_entity_type
+        body["source_criteria"] = criteria
+    enrichments = load_json_arg(args.enrichments, "enrichments")
+    if enrichments is not None:
+        body["enrichments"] = enrichments
+    body = strip_conversation_id(body, "shape") # never sent
+    req = compose("POST", args.base_url,
+                  "/audiences/%s/shape" % args.audience_id, body=body,
+                  api_key=args.api_key)
+    run(req, args)
+
+
+def _estimate_request(args):
+    query = {"audienceId": args.audience_id}
+    if args.final:
+        query["isFinalCall"] = "true"
+    return compose("GET", args.base_url, "/criterias/estimate", query=query,
+                   api_key=args.api_key)
+
+
+def cmd_estimate(args):
+    if not args.poll:
+        run(_estimate_request(args), args)
+        return
+    if args.dry_run:
+        print(render_dry_run(_estimate_request(args)))
+        return
+    # Poll: the estimate is computed after a shape; `finished_at` flips from
+    # null to a timestamp when the run is done. Poll until finished (or cap).
+    deadline = time.monotonic() + args.poll_timeout
+    last = None
+    while True:
+        final = time.monotonic() + args.poll_interval >= deadline
+        args.final = final
+        resp = send(_estimate_request(args), timeout=args.timeout)
+        last = resp
+        finished = resp.get("finished_at")
+        if finished:
+            emit(resp, args)
+            return
+        if time.monotonic() >= deadline:
+            sys.stderr.write("poll timed out after %ss; returning last "
+                             "estimate (finished_at still null).\n"
+                             % args.poll_timeout)
+            emit(last, args)
+            return
+        sys.stderr.write("estimate not final (people=%s companies=%s); "
+                         "retrying in %ss…\n"
+                         % (resp.get("people_count"),
+                            resp.get("companies_count"), args.poll_interval))
+        time.sleep(args.poll_interval)
+
+
+def cmd_field_values(args):
+    query = {"fieldId": args.field_id, "q": args.q, "limit": args.limit}
+    req = compose("GET", args.base_url, "/filters/field-values", query=query,
+                  api_key=args.api_key)
+    run(req, args)
+
+
+def cmd_find_values(args):
+    values = args.value or []
+    if args.values_json:
+        parsed = load_json_arg(args.values_json, "values")
+        if not isinstance(parsed, list):
+            raise ApiError("--values-json must be a JSON array of strings")
+        values = parsed
+    body = {"fieldId": args.field_id, "values": values}
+    req = compose("POST", args.base_url, "/filters/find-values", body=body,
+                  api_key=args.api_key)
+    run(req, args)
+
+
+def _coerce_records(parsed):
+    """Normalize a parsed JSON body to a flat list of record dicts.
+
+    Accepts a single object, a bare array, or a `{records: [...]}` envelope —
+    the three shapes `POST /ingest/*` takes."""
+    if isinstance(parsed, dict):
+        if "records" in parsed:
+            recs = parsed["records"]
+            if not isinstance(recs, list):
+                raise ApiError("`records` must be a JSON array")
+            return recs
+        return [parsed] # single record
+    if isinstance(parsed, list):
+        return parsed
+    raise ApiError("records must be a JSON object, array, or {records:[...]}")
+
+
+def _ingest_records(args):
+    """Collect + validate the records to ingest from --records / --ndjson."""
+    if args.records is not None and args.ndjson is not None:
+        raise ApiError("pass --records or --ndjson, not both")
+    if args.ndjson is not None:
+        raw = read_text_source(args.ndjson, "ndjson")
+        records = []
+        for lineno, line in enumerate(raw.splitlines(), 1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                records.append(json.loads(line))
+            except ValueError as exc:
+                raise ApiError("invalid NDJSON on line %d: %s" % (lineno, exc))
+    elif args.records is not None:
+        records = _coerce_records(load_json_arg(args.records, "records"))
+    else:
+        raise ApiError("ingest needs records — pass --records '<json>' / "
+                       "@file.json or --ndjson @file.ndjson (or - for stdin)")
+    if not records:
+        raise ApiError("no records to ingest (empty input)")
+    # Fail fast on the two guards the server enforces, with a precise message.
+    for i, rec in enumerate(records):
+        if not isinstance(rec, dict):
+            raise ApiError("record %d is not a JSON object" % i)
+        val = rec.get(args.id_field)
+        if val is None or (isinstance(val, str) and not val.strip()):
+            raise ApiError("record %d has no non-empty %r (the id_field) — "
+                           "every record needs a stable id" % (i, args.id_field))
+    return records
+
+
+def _chunks(seq, size):
+    if size and size > 0:
+        for i in range(0, len(seq), size):
+            yield seq[i:i + size]
+    else:
+        yield seq
+
+
+def cmd_ingest(args):
+    """POST /ingest/{people|companies} — push rows into a dataset in place.
+
+    One call replaces the old create→upload→import dance. Re-pushing the same
+    `dataset` name upserts by `id_field` (keep-others: fields you omit on a
+    record are cleared for that id). Rows split into <=50k-record batches."""
+    if args.dataset and INGEST_BATCH_MARKER in args.dataset:
+        raise ApiError("--dataset must not contain %r (reserved for the "
+                       "server's batch suffixes)" % INGEST_BATCH_MARKER)
+    records = _ingest_records(args)
+    query = {"dataset": args.dataset, "id_field": args.id_field}
+    path = "/ingest/%s" % args.entity
+    key = args.ingest_api_key or args.api_key
+    batch_size = args.batch_size if args.batch_size is not None else INGEST_MAX_RECORDS
+    batches = list(_chunks(records, batch_size))
+    for n, batch in enumerate(batches, 1):
+        if len(batches) > 1:
+            sys.stderr.write("ingest batch %d/%d (%d records)…\n"
+                             % (n, len(batches), len(batch)))
+        req = compose("POST", args.base_url, path, query=query, body=batch,
+                      api_key=key)
+        run(req, args)
+
+
+def cmd_datasets(args):
+    query = {"offset": args.offset, "limit": args.limit, "status": args.status}
+    req = compose("GET", args.base_url, "/imported-datasets", query=query,
+                  api_key=args.api_key)
+    run(req, args)
+
+
+def cmd_dataset_get(args):
+    req = compose("GET", args.base_url,
+                  "/imported-datasets/%s" % args.dataset_id,
+                  api_key=args.api_key)
+    run(req, args)
+
+
+def cmd_audit(args):
+    """Client-side job-title audit over an estimate's heuristics + preview.
+
+    Reads GET /criterias/estimate (NOT the deprecated heuristics route, which
+    now always returns 204). Surfaces the title/seniority distribution so the
+    skill can judge whether the estimated audience is on-target. Deterministic:
+    it only re-shapes numbers the server already returned; it invents nothing.
+    """
+    if args.input:
+        est = load_json_arg(args.input, "estimate")
+    elif args.dry_run:
+        print(render_dry_run(_estimate_request(args)))
+        return
+    else:
+        est = send(_estimate_request(args), timeout=args.timeout)
+    report = build_title_audit(est)
+    emit(report, args)
+
+
+def _heuristic_blocks(est):
+    """All heuristic blocks, from both `top` and `summary`. Runtime populates
+    `heuristics.top[]` (category `job_title`, `seniority`, …); older/other
+    responses may use `heuristics.summary[]`. Search both."""
+    h = (est or {}).get("heuristics") or {}
+    blocks = []
+    for key in ("top", "summary"):
+        for b in (h.get(key) or []):
+            if isinstance(b, dict):
+                blocks.append(b)
+    return blocks
+
+
+def _find_block(blocks, *needles):
+    for b in blocks:
+        label = (b.get("category") or b.get("name") or "").lower()
+        if any(n in label for n in needles):
+            return b
+    return None
+
+
+def _distribution(block, base):
+    """Rows sorted by count desc, with share vs the block's `total` when present,
+    else vs `base` (people_count), else vs the sum of the block's values."""
+    if not block:
+        return []
+    values = block.get("values") or []
+    total = block.get("total") or base or sum(v.get("value") or 0 for v in values)
+    out = []
+    for v in values:
+        count = v.get("value") or 0
+        out.append({
+            "label": v.get("label") or v.get("key"),
+            "count": count,
+            "share_pct": round(100.0 * count / total, 1) if total else None,
+        })
+    out.sort(key=lambda t: (t["count"] or 0), reverse=True)
+    return out
+
+
+def build_title_audit(est):
+    est = est or {}
+    people = est.get("people_count")
+    blocks = _heuristic_blocks(est)
+    # 'job_title' contains both 'job' and 'title'; 'Titles' summary block too.
+    titles = _distribution(_find_block(blocks, "title", "job"), people)
+    seniority = _distribution(_find_block(blocks, "seniority"), people)
+
+    # fallback: if there was no seniority heuristic, derive a rough mix from the
+    # (capped) preview sample when one is present.
+    preview_rows = ((est.get("preview") or {}).get("data")) or []
+    if not seniority and preview_rows:
+        agg = {}
+        for row in preview_rows:
+            s = row.get("seniority") or "unknown"
+            agg[s] = agg.get(s, 0) + 1
+        seniority = [{"label": k, "count": v, "share_pct": None}
+                     for k, v in sorted(agg.items(), key=lambda kv: kv[1],
+                                        reverse=True)]
+    return {
+        "people_count": people,
+        "companies_count": est.get("companies_count"),
+        "finished_at": est.get("finished_at"),
+        "title_distribution": titles[:25],
+        "seniority_mix": seniority,
+        "preview_rows_examined": len(preview_rows),
+        "note": "Title/seniority distributions come from estimate heuristics "
+                "(heuristics.top/summary); shares are vs people_count when a "
+                "block carries no total. Any preview is a capped sample, not "
+                "the full audience.",
+    }
+
+
+# --------------------------------------------------------------------------- #
+# arg parsing
+# --------------------------------------------------------------------------- #
+
+def build_parser():
+    p = argparse.ArgumentParser(
+        prog="primer",
+        description="Thin CLI over the Primer audience API-key endpoints. "
+                    "Set PRIMER_API_KEY (ak_…) and PRIMER_API_BASE_URL, or "
+                    "pass --api-key/--base-url.")
+    p.add_argument("--base-url",
+                   default=os.environ.get("PRIMER_API_BASE_URL"),
+                   help="API base URL (env PRIMER_API_BASE_URL). Required.")
+    p.add_argument("--api-key", default=os.environ.get("PRIMER_API_KEY"),
+                   help="Revocable Clerk API key, ak_… (env PRIMER_API_KEY).")
+    p.add_argument("--dry-run", action="store_true",
+                   help="Compose and print the request; send nothing.")
+    p.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT,
+                   help="Per-request timeout (s).")
+    p.add_argument("--compact", action="store_true",
+                   help="Emit compact single-line JSON.")
+    sub = p.add_subparsers(dest="command", required=True)
+
+    # list ------------------------------------------------------------------
+    s = sub.add_parser("list", help="GET /audiences — list audiences.")
+    s.add_argument("--offset")
+    s.add_argument("--limit", default="50")
+    s.add_argument("--sort", choices=["name", "size", "status", "updated_at",
+                                      "created_by", "created_at"])
+    s.add_argument("--order", choices=["ASC", "DESC"])
+    s.add_argument("--name")
+    s.add_argument("--status")
+    s.add_argument("--type")
+    s.set_defaults(func=cmd_list_audiences)
+
+    # create ----------------------------------------------------------------
+    s = sub.add_parser("create", help="POST /audiences — create an audience.")
+    s.add_argument("--name")
+    s.add_argument("--type", choices=["regular", "exclusion"])
+    s.add_argument("--target-entity-type", choices=ENTITY_TYPES,
+                   help="Fills source_criteria.target_entity_type if absent.")
+    s.add_argument("--criteria",
+                   help="source_criteria as JSON or @file.json.")
+    s.add_argument("--destination", action="append", metavar="KEY=BOOL",
+                   help="Repeatable, e.g. --destination csv=true. Sent as a "
+                        "destinations OBJECT of booleans.")
+    s.add_argument("--body", help="Full request body as JSON or @file.json "
+                                  "(convenience flags override its keys).")
+    s.set_defaults(func=cmd_create)
+
+    # get -------------------------------------------------------------------
+    s = sub.add_parser("get", help="GET /audiences/:id.")
+    s.add_argument("audience_id")
+    s.set_defaults(func=cmd_get)
+
+    # update ----------------------------------------------------------------
+    s = sub.add_parser("update",
+                       help="PATCH /audiences/:id — destinations/name only.")
+    s.add_argument("audience_id")
+    s.add_argument("--name")
+    s.add_argument("--destination", action="append", metavar="KEY=BOOL")
+    s.add_argument("--body", help="Full body as JSON or @file.json.")
+    s.set_defaults(func=cmd_update)
+
+    # shape -----------------------------------------------------------------
+    s = sub.add_parser("shape",
+                       help="POST /audiences/:id/shape — new filter revision.")
+    s.add_argument("audience_id")
+    s.add_argument("--target-entity-type", choices=ENTITY_TYPES)
+    s.add_argument("--criteria", help="source_criteria as JSON or @file.json.")
+    s.add_argument("--enrichments", help="enrichments as JSON or @file.json.")
+    s.add_argument("--body", help="Full body as JSON or @file.json.")
+    s.set_defaults(func=cmd_shape)
+
+    # estimate --------------------------------------------------------------
+    s = sub.add_parser("estimate",
+                       help="GET /criterias/estimate — current estimate.")
+    s.add_argument("audience_id", help="Audience id (sent as ?audienceId).")
+    s.add_argument("--poll", action="store_true",
+                   help="Poll until finished_at is set.")
+    s.add_argument("--final", action="store_true",
+                   help="Send isFinalCall=true (single-shot mode).")
+    s.add_argument("--poll-interval", type=float, default=3.0)
+    s.add_argument("--poll-timeout", type=float, default=180.0)
+    s.set_defaults(func=cmd_estimate)
+
+    # audit -----------------------------------------------------------------
+    s = sub.add_parser("audit",
+                       help="Client-side job-title audit over an estimate.")
+    s.add_argument("audience_id", nargs="?",
+                   help="Audience id to estimate then audit.")
+    s.add_argument("--input",
+                   help="Audit a saved estimate JSON (inline or @file.json) "
+                        "instead of fetching.")
+    s.add_argument("--final", action="store_true")
+    s.set_defaults(func=cmd_audit)
+
+    # field-values ----------------------------------------------------------
+    s = sub.add_parser("field-values",
+                       help="GET /filters/field-values — possible values.")
+    s.add_argument("field_id", choices=FIELD_IDS)
+    s.add_argument("--q", help="Substring filter.")
+    s.add_argument("--limit", default="250")
+    s.set_defaults(func=cmd_field_values)
+
+    # find-values -----------------------------------------------------------
+    s = sub.add_parser("find-values",
+                       help="POST /filters/find-values — resolve given values.")
+    s.add_argument("field_id", choices=FIELD_IDS)
+    s.add_argument("--value", action="append",
+                   help="Repeatable value to resolve.")
+    s.add_argument("--values-json", help="JSON array of values (inline/@file).")
+    s.set_defaults(func=cmd_find_values)
+
+    # ingest ----------------------------------------------------------------
+    s = sub.add_parser(
+        "ingest",
+        help="POST /ingest/{people|companies} — push rows into a dataset in "
+             "place (upsert by id; re-push same --dataset to refresh).")
+    s.add_argument("entity", choices=INGEST_ENTITIES,
+                   help="people or companies.")
+    s.add_argument("--records",
+                   help="Records as JSON (single object, array, or "
+                        "{records:[...]}), inline or @file.json.")
+    s.add_argument("--ndjson",
+                   help="Records as NDJSON (one JSON object per line), "
+                        "@file.ndjson or - for stdin.")
+    s.add_argument("--dataset",
+                   help="Logical dataset name (server default: from_api). Same "
+                        "name each push = in-place refresh. No '-batch-'.")
+    s.add_argument("--id-field", dest="id_field", default="id",
+                   help="JSON key holding each record's stable id (default id). "
+                        "Every record must set it non-empty.")
+    s.add_argument("--batch-size", dest="batch_size", type=int, default=None,
+                   help="Records per request (default/cap 50000). Larger inputs "
+                        "auto-split; 0 disables client-side chunking.")
+    s.add_argument("--ingest-api-key", dest="ingest_api_key",
+                   default=os.environ.get("PRIMER_INGEST_API_KEY"),
+                   help="ak_ key for ingest (env PRIMER_INGEST_API_KEY; 600/min "
+                        "limiter). Falls back to --api-key / PRIMER_API_KEY.")
+    s.set_defaults(func=cmd_ingest)
+
+    # dataset reads (origin-agnostic; writes go through `ingest`) ------------
+    s = sub.add_parser("datasets", help="GET /imported-datasets — list.")
+    s.add_argument("--offset")
+    s.add_argument("--limit")
+    s.add_argument("--status", choices=["initiated", "completed", "failed"])
+    s.set_defaults(func=cmd_datasets)
+
+    s = sub.add_parser("dataset-get", help="GET /imported-datasets/:id.")
+    s.add_argument("dataset_id")
+    s.set_defaults(func=cmd_dataset_get)
+
+    return p
+
+
+def main(argv=None):
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    try:
+        args.func(args)
+    except ApiError as exc:
+        sys.stderr.write("error: %s\n" % exc)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
