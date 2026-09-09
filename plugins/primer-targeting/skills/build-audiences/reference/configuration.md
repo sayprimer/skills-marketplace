@@ -1,7 +1,7 @@
 # Configuration
 
 The `build-audiences` skill drives the Primer audience API-key endpoints
-through the bundled `bin/primer-audience` CLI (stdlib-only Python 3 — no
+through the bundled `bin/primer` CLI (stdlib-only Python 3 — no
 install). Everything below is what the CLI needs to reach the API.
 
 ## Credentials & base URL
@@ -61,7 +61,7 @@ inspect the composed body before spending a real call — especially when passin
 a hand-authored `--criteria`/`--body` JSON.
 
 ```bash
-primer-audience --dry-run shape aud_123 --criteria @criteria.json
+primer --dry-run shape aud_123 --criteria @criteria.json
 ```
 
 ## Poll & value caps

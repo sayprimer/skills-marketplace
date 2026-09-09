@@ -12,7 +12,7 @@ Turns an ICP — a description of who you want to reach — into a Primer
 **audience**, then refines it until the audience actually matches: it resolves
 prose to filter values, creates and shapes the audience, polls the estimate, and
 audits the job-title and seniority mix, re-shaping until the mix fits. Ships a
-dependency-free Python CLI (`bin/primer-audience`) that drives the Primer
+dependency-free Python CLI (`bin/primer`) that drives the Primer
 audience and ingest API-key endpoints.
 
 Requires a Primer API key (`ak_…`). Contact Primer to get one.

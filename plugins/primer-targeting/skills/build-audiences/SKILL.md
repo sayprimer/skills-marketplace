@@ -3,7 +3,7 @@ name: build-audiences
 description: |
   Builds and refines a Primer audience programmatically from a description of
   who the customer wants to reach (an ICP), by driving the Primer audience
-  API-key endpoints through the bundled `bin/primer-audience` CLI. Use this
+  API-key endpoints through the bundled `bin/primer` CLI. Use this
   skill whenever the user wants to "build an audience", "refine an audience",
   "create a Primer audience", "translate an ICP into filters", "size/estimate
   an audience", "check who's in an audience", or asks to tighten targeting so a
@@ -22,7 +22,7 @@ This skill turns a customer's **ICP** ("who we want to reach") into a Primer
 **audience** — a filter set the customer can push to ad and outbound
 destinations — and then **refines** it until the audience actually matches the
 ICP. It drives the audience API-key endpoints through the bundled
-`bin/primer-audience` CLI. All the mechanics (auth, request shapes, polling)
+`bin/primer` CLI. All the mechanics (auth, request shapes, polling)
 live in the CLI and `reference/api-contract.md`; **your job is the judgment** —
 translating the ICP to filters, reading the estimate, and deciding what to
 change.
@@ -56,9 +56,9 @@ valid filter values. Resolve them:
 
 ```bash
 # enumerate what's available for a field (optionally filtered by a substring)
-bin/primer-audience field-values industry --q insurance
+bin/primer field-values industry --q insurance
 # resolve specific named values
-bin/primer-audience find-values job_title --value "VP Marketing" --value "CMO"
+bin/primer find-values job_title --value "VP Marketing" --value "CMO"
 ```
 
 Use these to assemble a `source_criteria` object:
@@ -67,7 +67,7 @@ Use these to assemble a `source_criteria` object:
 ### Step 2 — Create the audience
 
 ```bash
-bin/primer-audience create --name "Acme — Growth leaders @ DTC" \
+bin/primer create --name "Acme — Growth leaders @ DTC" \
   --type regular --target-entity-type company \
   --criteria @criteria.json
 ```
@@ -81,7 +81,7 @@ you're still refining.)
 ### Step 3 — Shape it
 
 ```bash
-bin/primer-audience shape <id> --criteria @criteria.json
+bin/primer shape <id> --criteria @criteria.json
 ```
 
 `shape` returns `{ estimateUpdated, updatedAudience }`. A new shape kicks off an
@@ -90,7 +90,7 @@ asynchronous estimate.
 ### Step 4 — Estimate (poll)
 
 ```bash
-bin/primer-audience estimate <id> --poll
+bin/primer estimate <id> --poll
 ```
 
 Polls `GET /criterias/estimate` until `finished_at` is set. You get
@@ -100,7 +100,7 @@ Polls `GET /criterias/estimate` until `finished_at` is set. You get
 ### Step 5 — Audit the audience
 
 ```bash
-bin/primer-audience audit <id>
+bin/primer audit <id>
 ```
 
 `audit` reads the same estimate and summarizes the **job-title distribution**
@@ -120,7 +120,7 @@ Loop Steps 3–5 until the audience matches the ICP. Then, if the customer wants
 to activate it, set export destinations:
 
 ```bash
-bin/primer-audience update <id> --destination meta=true --destination csv=true
+bin/primer update <id> --destination meta=true --destination csv=true
 ```
 
 > **Never** send `archived` — the CLI refuses it. Setting `archived: true`
@@ -135,7 +135,7 @@ create→upload→import dance:
 
 ```bash
 # people or companies; records inline, @file.json, or NDJSON (@file / - stdin)
-bin/primer-audience ingest companies --dataset acme-accounts \
+bin/primer ingest companies --dataset acme-accounts \
   --records @accounts.json
 ```
 
