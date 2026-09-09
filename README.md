@@ -81,9 +81,10 @@ auto-update off:
 /plugin install primer-targeting@sayprimer
 ```
 
-**Teams and organizations.** An admin can enable auto-update for everyone
-without each person toggling it, by declaring the marketplace in a project's
-`.claude/settings.json` or in managed settings:
+Instead of the UI toggle, you can set it in `~/.claude/settings.json` for
+yourself — or an admin can put the same block in a project's
+`.claude/settings.json` or in managed settings to enable it for everyone
+without each person toggling it:
 
 ```json
 {
@@ -96,8 +97,20 @@ without each person toggling it, by declaring the marketplace in a project's
 }
 ```
 
-**Claude Cowork.** An org owner connects this repo under Organization settings
-→ Plugins → Add plugin → GitHub, and Cowork syncs from it.
+**Claude Cowork — nothing for you to do; one setting for your org owner.**
+Cowork does **not** read `~/.claude/settings.json`, so none of the above
+applies to it. It sources plugins from your claude.ai account and downloads
+them fresh into each session, which means members always start a session on
+whatever version the org marketplace currently holds — there is no per-user
+update step and no `/reload-plugins`.
+
+What gates it is the org marketplace sync, and **syncs are manual by default**.
+An org owner enables automatic propagation once, in **Organization settings →
+Plugins → Libraries**: find the marketplace, open the menu on its card, and
+toggle **Sync automatically** on. From then on every merge to the connected
+branch triggers a sync. Without it, someone has to click **Update** on the
+marketplace card for each release — until they do, members stay on the old
+version no matter what they do on their end.
 
 **Known limitation.** Claude Code currently skips background plugin
 auto-updates on Homebrew and other package-manager installs even when
