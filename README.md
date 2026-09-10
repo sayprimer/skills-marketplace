@@ -42,9 +42,9 @@ ln -s "$PWD/skills-marketplace/.agents/skills/build-audiences" \
 
 | What | Env var | Notes |
 |------|---------|-------|
-| API key | `PRIMER_API_KEY` | Secret, prefixed `ak_`. Never commit it. **The only thing you have to set.** |
+| API key | `PRIMER_API_KEY` | Secret, prefixed `ak_`. Never commit it. |
 | Ingest API key | `PRIMER_INGEST_API_KEY` | Optional; falls back to `PRIMER_API_KEY`. |
-| API host | `PRIMER_API_BASE_URL` | Optional; defaults to Primer's production host. Set it only for a dedicated or regional deployment. |
+| API host | `PRIMER_API_BASE_URL` | Optional — defaults to Primer production. |
 
 The CLI is stdlib-only Python 3.8+ — no install, no third-party dependencies.
 Every write verb supports `--dry-run`, which prints the exact request (with the
@@ -112,18 +112,9 @@ branch triggers a sync. Without it, someone has to click **Update** on the
 marketplace card for each release — until they do, members stay on the old
 version no matter what they do on their end.
 
-**Known limitation.** Claude Code currently skips background plugin
-auto-updates on Homebrew and other package-manager installs even when
-`autoUpdate` is true — see
-<https://github.com/anthropics/claude-code/issues/86139> (open as of
-September 2026). If you installed that way, use the manual
-`/plugin marketplace update sayprimer` above. Background updates are also
-skipped when `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` or
-`DISABLE_AUTOUPDATER` is set.
-
 ## Contributing
 
 This repo is **generated** from Primer's internal source of truth and published
 as sanitized snapshots — direct edits here are overwritten on the next publish.
-Please open an issue rather than a pull request. See
-[CONTRIBUTING.md](CONTRIBUTING.md) for why, and how a change reaches you.
+Please open an issue rather than a pull request; accepted changes are made
+upstream and land in the following release.

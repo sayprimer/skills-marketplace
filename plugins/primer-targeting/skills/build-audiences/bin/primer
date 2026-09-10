@@ -3,8 +3,8 @@
 
 Stdlib-only (Python 3.8+). No install, no third-party deps. Drives the audience
 API-key endpoints and the HTTP dataset-ingest endpoints described in
-`reference/api-contract.md`, which is generated from the authoritative contract. This CLI is the mechanical transport the `build-audiences` skill
-drives; all judgment lives in the skill.
+`reference/api-contract.md`. This CLI is the mechanical transport the
+`build-audiences` skill drives; all judgment lives in the skill.
 
 Getting rows into Primer goes through the continuously-updatable `ingest` verb
 (`POST /ingest/{people|companies}`): pushing the same `dataset` name again
@@ -53,11 +53,11 @@ FIELD_IDS = [
 ]
 ENTITY_TYPES = ["company", "person"]
 # Ad/export destinations. `destinations` is a JSON OBJECT of booleans, not an
-# array.
+# array (a corrected contract drift item).
 DESTINATION_KEYS = [
     "meta", "google", "linkedIn", "reddit", "dv360", "salesforce", "csv",
 ]
-PREVIEW_OFFSET_MAX = 225 # value cap on estimate/preview offset.
+PREVIEW_OFFSET_MAX = 225  # value cap on estimate/preview offset.
 
 # Ingest (POST /ingest/{people|companies}). Server limits per request: 50k
 # records / 10 MB body; 600 req/min per org. `dataset` must not contain the
@@ -286,7 +286,7 @@ def _criteria_body(args):
 
 def cmd_create(args):
     body = _criteria_body(args)
-    body = strip_conversation_id(body, "create") # never sent
+    body = strip_conversation_id(body, "create")  # never sent
     req = compose("POST", args.base_url, "/audiences", body=body,
                   api_key=args.api_key)
     run(req, args)
@@ -326,7 +326,7 @@ def cmd_shape(args):
     enrichments = load_json_arg(args.enrichments, "enrichments")
     if enrichments is not None:
         body["enrichments"] = enrichments
-    body = strip_conversation_id(body, "shape") # never sent
+    body = strip_conversation_id(body, "shape")  # never sent
     req = compose("POST", args.base_url,
                   "/audiences/%s/shape" % args.audience_id, body=body,
                   api_key=args.api_key)
@@ -405,7 +405,7 @@ def _coerce_records(parsed):
             if not isinstance(recs, list):
                 raise ApiError("`records` must be a JSON array")
             return recs
-        return [parsed] # single record
+        return [parsed]  # single record
     if isinstance(parsed, list):
         return parsed
     raise ApiError("records must be a JSON object, array, or {records:[...]}")
@@ -466,6 +466,11 @@ def cmd_ingest(args):
     path = "/ingest/%s" % args.entity
     key = args.ingest_api_key or args.api_key
     batch_size = args.batch_size if args.batch_size is not None else INGEST_MAX_RECORDS
+    if batch_size == 0 and len(records) > INGEST_MAX_RECORDS:
+        sys.stderr.write("warning: --batch-size 0 disables client-side "
+                         "chunking; %d records in one request exceeds the "
+                         "server's %d-record limit and will likely 413.\n"
+                         % (len(records), INGEST_MAX_RECORDS))
     batches = list(_chunks(records, batch_size))
     for n, batch in enumerate(batches, 1):
         if len(batches) > 1:
@@ -498,6 +503,9 @@ def cmd_audit(args):
     skill can judge whether the estimated audience is on-target. Deterministic:
     it only re-shapes numbers the server already returned; it invents nothing.
     """
+    if args.input is None and args.audience_id is None:
+        raise ApiError("audit needs an audience id (positional) or a saved "
+                       "estimate via --input")
     if args.input:
         est = load_json_arg(args.input, "estimate")
     elif args.dry_run:

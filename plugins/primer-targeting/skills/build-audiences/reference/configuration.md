@@ -32,7 +32,7 @@ record count); `429` means back off, `413` means the batch was too big.
 Export once per shell — the key is all you need against production:
 
 ```bash
-export PRIMER_API_KEY="ak_…" # provided out-of-band; keep it secret
+export PRIMER_API_KEY="ak_…"          # provided out-of-band; keep it secret
 ```
 
 The CLI redacts the key in all `--dry-run` output (`Bearer ak_tes…7890`).
@@ -73,7 +73,7 @@ primer --dry-run shape aud_123 --criteria @criteria.json
 
 ## Verifying against the contract
 
-`reference/api-contract.md` is generated from the OpenAPI subset. When
-that artifact is re-issued, regenerate the contract doc and re-check the CLI
-body shapes against it — the CLI ↔ endpoint map at the bottom of the contract is
-the checklist.
+`reference/api-contract.md` is the authoritative endpoint reference the CLI
+targets, and the CLI ↔ endpoint map at the bottom of it is the checklist tying
+each verb to its endpoint. If a call's request or response shape ever disagrees
+with the contract, trust the contract and report the discrepancy.

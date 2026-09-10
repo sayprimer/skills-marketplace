@@ -199,7 +199,7 @@ not enabled for the org; `413` over 10 MB or 50k records; `429` rate-limited
 
 - `preview.offset` ∈ **[0, 225]** (create `initial.estimate.preview`, all
   `shape`/audience `heuristics.preview`, and `/criterias/estimate`).
-- Corrected drift confirmed present in the artifact and reflected above:
+- Corrected drift confirmed present in the contract and reflected above:
   1. create `destinations` is an **object**, not an array;
   2. `POST …/shape` **returns a body**, not `204`;
   3. combined `/criterias/estimate` uses camelCase **`audienceId`**, **no
@@ -210,9 +210,9 @@ not enabled for the org; `413` over 10 MB or 50k records; `429` rate-limited
 ## Response shapes confirmed against runtime
 
 Three responses differ from a naïve reading of the endpoint schemas above.
-These are the **confirmed runtime shapes** and the canonical contract — an
-earlier gap between the generated OpenAPI and the live responses was reconciled, so the spec and runtime now agree. Recorded here so consumers aren't
-surprised; the CLI already handles all three.
+These are the **confirmed runtime shapes** and the canonical contract — the
+generated OpenAPI and the live responses agree. Recorded here so consumers
+aren't surprised; the CLI already handles all three.
 
 1. **`POST /audiences` returns an envelope, not a bare audience.** It returns
    `{ estimateUpdated, updatedAudience{…audience} }` (the same shape as

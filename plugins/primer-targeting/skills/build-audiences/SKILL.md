@@ -29,15 +29,16 @@ change.
 
 ## Before you start
 
-- **API key.** The CLI reads a revocable Primer API key from `PRIMER_API_KEY`, or `--api-key` per call. **This
-  is the only thing the user must supply** — if it isn't set, ask them for it.
-  Treat it as a secret: use it to make calls, but don't repeat it back in chat
-  or write it into files or transcripts.
+- **API key.** The CLI reads a revocable Primer API key (secret, prefixed
+  `ak_`) from `PRIMER_API_KEY`, or `--api-key` per call. **This is the only
+  thing the user must supply** — if it isn't set, ask them for it. Treat it as a
+  secret: use it to make calls, but don't repeat it back in chat or write it
+  into files or transcripts.
 - **Host.** The API host defaults to Primer production, so don't ask for it.
   Override it (`PRIMER_API_BASE_URL` / `--base-url`) only if the user says they
   are on a dedicated or regional deployment. See `reference/configuration.md`.
 - **Contract.** `reference/api-contract.md` is the authoritative endpoint
-  reference, generated from the OpenAPI subset. Trust it over memory.
+  reference. Trust it over memory.
 
 ## The loop
 

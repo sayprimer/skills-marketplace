@@ -14,52 +14,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       # This repo is generated from Primer's private source of truth. The gate
       # re-asserts, on the published artifact itself, every invariant the
-      # publisher enforced — so a hand-edit or a bad publish fails loudly here
-      # rather than sitting in main.
+      # publisher enforced upstream — a hand-edit or bad publish fails here.
       - name: Scan for internal content
-        run: |
-          fail=0
-          gate() {
-            local label="$1" pat="$2" glob="${3:-}" hits
-            if hits="$(grep -RInE ${glob:+--include="$glob"} "$pat" . \
-                        --exclude-dir=.git --exclude-dir=.github 2>/dev/null)"; then
-              echo "::error::LEAK [$label]"
-              echo "$hits" | sed 's/^/    /'
-              fail=1
-            fi
-          }
-          # NOTE: this public gate checks SHAPES, not proper nouns. The
-          # publisher's gate upstream additionally screens a denylist of real
-          # customer, partner, and internal-hostname strings — that list stays
-          # private, because publishing a denylist of names discloses exactly
-          # the names it exists to block. This job is defense in depth; the
-          # authoritative screen runs before anything is pushed here.
-          gate "internal fence"        '<!-- *internal:(begin|end)'
-          gate "jira id"               '\bAUD-[0-9]+'
-          gate "work-item id"          '\bWI-?[0-9]+'
-          gate "empty bold artifact"   '\*\*\*\*' '*.md'
-          gate "internal issue/PR ref" '((PR|pull request|issue|ticket)[[:space:]]*#[0-9]+|#[0-9]{4,})'
-          gate "internal doc ref"      '(Notion|Confluence|Google Doc)'
-          gate "non-production host"   'staging\.|\.int\.|127\.0\.0\.1|localhost'
-          gate "internal environment"  '([Ss]taging|[Ll]ocal dev|deploy-env)'
-          gate "internal api-docs"     'api-docs|swagger\.json'
-          gate "api-key secret"        'ak_[A-Za-z0-9]{12,}'
-          gate "clerk/stripe live key" '(sk_live_|sk_test_)[A-Za-z0-9]{10,}'
-          gate "operator api-key tool" 'CLERK_SECRET_KEY|primer-apikey|api\.clerk\.com'
-          gate "aws access key id"     'AKIA[0-9A-Z]{16}'
-          gate "private key block"     '-----BEGIN [A-Z ]*PRIVATE KEY-----'
-          gate "postgres dsn"          'PRIMER_PG_DSN|postgres(ql)?://[^ ]*:[^ ]*@'
-          gate "author home path"      '/Users/[a-z]'
-          gate "infra identifiers"     'IRSA|is_live|DuckDB'
-          if [ "$fail" -ne 0 ]; then
-            echo "::error::leak-gate failed — internal content present"
-            exit 1
-          fi
-          echo "leak-gate clean"
-
+        run: bash .github/leak-gate.sh .
       - name: Validate manifests and skill frontmatter
         run: |
           python3 - <<'PY'
@@ -68,24 +27,17 @@ jobs:
           mp = json.load(open('.claude-plugin/marketplace.json'))
           for p in mp['plugins']:
               src = pathlib.Path(p['source'])
-              pj = src / '.claude-plugin' / 'plugin.json'
-              if not pj.exists():
-                  fail.append(f"missing {pj}"); continue
-              man = json.load(open(pj))
+              man = json.load(open(src / '.claude-plugin' / 'plugin.json'))
               if man['name'] != p['name']:
                   fail.append(f"name mismatch: {man['name']} vs {p['name']}")
               for skill in (src / 'skills').iterdir():
-                  sm = skill / 'SKILL.md'
-                  if not sm.exists():
-                      fail.append(f"missing {sm}"); continue
-                  head = sm.read_text().split('---')[1]
+                  head = (skill / 'SKILL.md').read_text().split('---')[1]
                   if f"name: {skill.name}" not in head:
-                      fail.append(f"frontmatter name != dir name in {sm}")
+                      fail.append(f"frontmatter name != dir name in {skill}")
                   if 'description:' not in head:
-                      fail.append(f"no description in {sm}")
+                      fail.append(f"no description in {skill}")
           print('\n'.join(fail) if fail else 'manifests OK')
           sys.exit(1 if fail else 0)
           PY
-
       - name: CLI smoke test
         run: python3 plugins/primer-targeting/skills/build-audiences/bin/primer --help
