@@ -1,5 +1,5 @@
 ---
-name: build-audiences
+name: audience-refiner
 description: |
   Builds and refines a Primer audience programmatically from a description of
   who the customer wants to reach (an ICP), by driving the Primer audience
@@ -29,15 +29,16 @@ change.
 
 ## Before you start
 
-- **API key.** The CLI reads a revocable Primer API key from `PRIMER_API_KEY`, or `--api-key` per call. **This
-  is the only thing the user must supply** — if it isn't set, ask them for it.
-  Treat it as a secret: use it to make calls, but don't repeat it back in chat
-  or write it into files or transcripts.
+- **API key.** The CLI reads a revocable Primer API key (secret, prefixed
+  `ak_`) from `PRIMER_API_KEY`, or `--api-key` per call. **This is the only
+  thing the user must supply** — if it isn't set, ask them for it. Treat it as a
+  secret: use it to make calls, but don't repeat it back in chat or write it
+  into files or transcripts.
 - **Host.** The API host defaults to Primer production, so don't ask for it.
   Override it (`PRIMER_API_BASE_URL` / `--base-url`) only if the user says they
   are on a dedicated or regional deployment. See `reference/configuration.md`.
 - **Contract.** `reference/api-contract.md` is the authoritative endpoint
-  reference, generated from the OpenAPI subset. Trust it over memory.
+  reference. Trust it over memory.
 
 ## The loop
 
@@ -73,11 +74,12 @@ bin/primer create --name "Acme — Growth leaders @ DTC" \
   --criteria @criteria.json
 ```
 
-Read the new id from **`updatedAudience.id`** — at runtime `create` returns a
-`{ estimateUpdated, updatedAudience }` envelope (see the runtime note in
-`reference/api-contract.md`), not a bare audience object. (`destinations` are
-set later, once the audience is dialed in — don't wire ad destinations while
-you're still refining.)
+Read the new id from **`updatedAudience.id`** — `create` returns a
+`{ estimateUpdated, updatedAudience }` envelope (see the `POST /audiences`
+response in `reference/api-contract.md`), not a bare audience object. The server
+may prefix the org name to the audience `name` you sent. (`destinations` are set
+later, once the audience is dialed in — don't wire ad destinations while you're
+still refining.)
 
 ### Step 3 — Shape it
 
@@ -153,20 +155,14 @@ bin/primer ingest companies --dataset acme-accounts \
 
 The static one-time CSV upload path is intentionally gone from this CLI — there
 is no `dataset-create`/`dataset-import`/`dataset-delete`; everything goes
-through `ingest` so the dataset remains refreshable. See the **Ingest** section
-of `reference/api-contract.md`.
+through `ingest` so the dataset remains refreshable. See the `POST /ingest/*`
+endpoints in `reference/api-contract.md`.
 
 > **Be precise about auto-refresh.** `ingest` push/refresh works today with just
 > the API key. Whether new rows then *auto-rebuild dependent audiences* is a
 > separate, downstream concern handled by the platform's dynamic-audiences
 > processor. Describe `ingest` as keeping the *dataset* current, and don't
 > over-promise audience auto-rebuild.
-
-## conversation_id is client-side only
-
-If you track a conversation id locally, keep it local. The skill and CLI
-**never** send `conversation_id` to the server — there is no server-side
-conversation stitching. The CLI strips it from any write body.
 
 ## Guardrails
 
@@ -178,3 +174,28 @@ conversation stitching. The CLI strips it from any write body.
   sample (`offset` ≤ 225), not the whole audience — say "in the sample" when
   citing it.
 - **Dry-run hand-authored bodies** (`--dry-run`) before sending.
+
+## CLI verbs → endpoints
+
+Which verb drives which endpoint. `reference/api-contract.md` is the mechanical
+shape of each endpoint; this is the map from what you type to what it calls.
+
+| CLI verb | Endpoint |
+| --- | --- |
+| `list` | `GET /audiences` |
+| `create` | `POST /audiences` |
+| `get` | `GET /audiences/:id` |
+| `update` | `PATCH /audiences/:id` |
+| `shape` | `POST /audiences/:id/shape` |
+| `estimate [--poll]` | `GET /criterias/estimate` |
+| `audit` | client-side title/seniority audit over the estimate |
+| `field-values` | `GET /filters/field-values` |
+| `find-values` | `POST /filters/find-values` |
+| `ingest people` | `POST /ingest/people` |
+| `ingest companies` | `POST /ingest/companies` |
+| `datasets` | `GET /imported-datasets` |
+| `dataset-get` | `GET /imported-datasets/:id` |
+| _(none)_ | `POST`/`import`/`DELETE /imported-datasets` — the static CSV path, superseded by `ingest` |
+
+The deprecated `GET /audiences/:id/:shapeId/estimate/heuristics` route (`204 No
+Content`) is intentionally unmapped; read heuristics from `estimate` instead.
