@@ -47,10 +47,9 @@ hand-authored body before sending.
 
 ### Step 0 — Capture the ICP
 Get the ICP into the light structure in `reference/ICP-template.md`. You do not
-need every field — you need the target entity (`company` vs `person`), the
-firmographic and buyer filters, hard exclusions, a few known-good / known-bad
-examples, and a rough size expectation. The examples and size are your
-acceptance test later.
+need every field — you need the firmographic and buyer filters, hard
+exclusions, a few known-good / known-bad examples, and a rough size
+expectation. The examples and size are your acceptance test later.
 
 ### Step 1 — Resolve filter values
 The ICP names things in prose ("insurance", "VP Marketing"); the API needs
@@ -65,12 +64,15 @@ bin/primer find-values job_title --value "VP Marketing" --value "CMO"
 
 Use these to assemble a `source_criteria` object:
 `{ target_entity_type, group{ operator, filters[], group_unique_id } }`.
+Set `target_entity_type` to `person`, also for an account list. An audience
+resolves to people, and company filters choose the companies they work at. The
+API stores `company` as `person`.
 
 ### Step 2 — Create the audience
 
 ```bash
 bin/primer create --name "Acme — Growth leaders @ DTC" \
-  --type regular --target-entity-type company \
+  --type regular --target-entity-type person \
   --criteria @criteria.json
 ```
 
