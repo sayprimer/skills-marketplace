@@ -12,9 +12,9 @@ the API verbatim.
 > where we sell to growth/performance-marketing leaders."_
 
 ## 2. Target entity
-- **Primary entity:** `company` or `person`? (Drives
-  `source_criteria.target_entity_type`.) Most ICPs anchor on `company` and then
-  narrow to the buying role with person-level title/seniority filters.
+- **Always `person`** (`source_criteria.target_entity_type`). An audience
+  resolves to people. Most ICPs anchor on company filters and then narrow to the
+  buying role with person-level title/seniority filters.
 
 ## 3. Company (firmographic) filters
 | Dimension | Include | Exclude | Field |

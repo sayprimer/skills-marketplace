@@ -52,7 +52,7 @@ ENTITY_TYPES = ["company", "person"]
 # Ad/export destinations. `destinations` is a JSON OBJECT of booleans, not an
 # array (a corrected contract drift item).
 DESTINATION_KEYS = [
-    "meta", "google", "linkedIn", "reddit", "dv360", "salesforce", "csv",
+    "meta", "google", "linkedIn", "reddit", "dv360", "microsoft", "salesforce", "csv",
 ]
 PREVIEW_OFFSET_MAX = 225  # value cap on estimate/preview offset.
 
@@ -612,7 +612,9 @@ def build_parser():
     s.add_argument("--name")
     s.add_argument("--type", choices=["regular", "exclusion"])
     s.add_argument("--target-entity-type", choices=ENTITY_TYPES,
-                   help="Fills source_criteria.target_entity_type if absent.")
+                   default="person",
+                   help="Fills source_criteria.target_entity_type if absent. "
+                        "Default: person.")
     s.add_argument("--criteria",
                    help="source_criteria as JSON or @file.json.")
     s.add_argument("--destination", action="append", metavar="KEY=BOOL",
@@ -640,7 +642,10 @@ def build_parser():
     s = sub.add_parser("shape",
                        help="POST /audiences/:id/shape — new filter revision.")
     s.add_argument("audience_id")
-    s.add_argument("--target-entity-type", choices=ENTITY_TYPES)
+    s.add_argument("--target-entity-type", choices=ENTITY_TYPES,
+                   default="person",
+                   help="Fills source_criteria.target_entity_type if absent. "
+                        "Default: person.")
     s.add_argument("--criteria", help="source_criteria as JSON or @file.json.")
     s.add_argument("--enrichments", help="enrichments as JSON or @file.json.")
     s.add_argument("--body", help="Full body as JSON or @file.json.")

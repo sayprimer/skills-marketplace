@@ -60,10 +60,22 @@ Content-Type `application/json`: { `name`, `destinations`, `source_criteria`, `i
 | Field | Required | Schema | Default | Description |
 | --- | --- | --- | --- | --- |
 | `chat_id` | no | string |  | Chat ID to link with this audience when the chat was started before the audience existed |
-| `destinations` | no | { `meta`, `google`, `linkedIn`, `reddit`, `dv360`, `salesforce`, `csv` } | `{}` | Specifies the destinations for the audience, detailing where the audience data is utilized or exported. |
+| `destinations` | no | { `meta`, `google`, `linkedIn`, `reddit`, `dv360`, `microsoft`, `salesforce`, `csv` } | `{}` | Specifies the destinations for the audience, detailing where the audience data is utilized or exported. |
+| `destinations.csv` | no | boolean |  | Indicates whether CSV export is selected as a destination for the audience. |
+| `destinations.dv360` | no | boolean |  | Indicates whether DV360 is selected as a destination for the audience. |
+| `destinations.google` | no | boolean |  | Indicates whether Google is selected as a destination for the audience. |
+| `destinations.linkedIn` | no | boolean |  | Indicates whether LinkedIn is selected as a destination for the audience. |
+| `destinations.meta` | no | boolean |  | Indicates whether Facebook is selected as a destination for the audience. |
+| `destinations.microsoft` | no | boolean |  | Indicates whether Microsoft Ads is selected as a destination for the audience. |
+| `destinations.reddit` | no | boolean |  | Indicates whether Reddit is selected as a destination for the audience. |
+| `destinations.salesforce` | no | boolean |  | Indicates whether Salesforce is selected as a destination for the audience. |
 | `initial` | no | { `source_criteria`, `estimate` } \| null |  | The previous shape of the audience. |
+| `initial.estimate` | no | { `people_count`, `companies_count`, `heuristics`, `match_rate`, `preview` } \| null |  | The previous estimate of the audience. |
+| `initial.source_criteria` | no | { `target_entity_type`, `group` } \| null |  | The previous source criteria of the audience. |
 | `name` | no | string |  | The name of the new audience. |
 | `source_criteria` | no | { `target_entity_type`, `group` } \| null |  | The source criteria of the audience. |
+| `source_criteria.group` | no | { `operator`, `filters`, `group_unique_id` } \| null |  | Main group of the audience |
+| `source_criteria.target_entity_type` | no | enum(`company`, `person`) | `"person"` | The entity the audience resolves to. Omit it — it defaults to "person", and every audience resolves to people (company filters like industry, headcount and domain resolve against people too). "company" is legacy: accepted for back-compat but stored as "person". |
 | `type` | no | enum(`regular`, `exclusion`, `conversion_report`) | `"regular"` | Type of audience to create. |
 
 **Responses**
@@ -116,7 +128,15 @@ Content-Type `application/json`: The updatable fields of an audience: its name, 
 | Field | Required | Schema | Default | Description |
 | --- | --- | --- | --- | --- |
 | `archived` | no | boolean |  | When true, archives the audience; when false, unarchives it. Archiving triggers an irreversible ad-audience clawback, so API-key callers should send only `destinations` and omit this field. |
-| `destinations` | no | { `meta`, `google`, `linkedIn`, `reddit`, `dv360`, `salesforce`, `csv` } |  | Specifies the destinations for the audience, detailing where the audience data is utilized or exported. |
+| `destinations` | no | { `meta`, `google`, `linkedIn`, `reddit`, `dv360`, `microsoft`, `salesforce`, `csv` } |  | Specifies the destinations for the audience, detailing where the audience data is utilized or exported. |
+| `destinations.csv` | no | boolean |  | Indicates whether CSV export is selected as a destination for the audience. |
+| `destinations.dv360` | no | boolean |  | Indicates whether DV360 is selected as a destination for the audience. |
+| `destinations.google` | no | boolean |  | Indicates whether Google is selected as a destination for the audience. |
+| `destinations.linkedIn` | no | boolean |  | Indicates whether LinkedIn is selected as a destination for the audience. |
+| `destinations.meta` | no | boolean |  | Indicates whether Facebook is selected as a destination for the audience. |
+| `destinations.microsoft` | no | boolean |  | Indicates whether Microsoft Ads is selected as a destination for the audience. |
+| `destinations.reddit` | no | boolean |  | Indicates whether Reddit is selected as a destination for the audience. |
+| `destinations.salesforce` | no | boolean |  | Indicates whether Salesforce is selected as a destination for the audience. |
 | `name` | no | string |  | The new name for the audience. |
 
 **Responses**
@@ -146,6 +166,8 @@ Content-Type `application/json`: { `source_criteria`, `enrichments` }.
 | --- | --- | --- | --- | --- |
 | `enrichments` | no | any \| null |  | Optional enrichment selections for the shape. Currently unused by the server; may be omitted. |
 | `source_criteria` | no | { `target_entity_type`, `group` } |  | The filter criteria that define the new shape. |
+| `source_criteria.group` | no | { `operator`, `filters`, `group_unique_id` } \| null |  | Main group of the audience |
+| `source_criteria.target_entity_type` | no | enum(`company`, `person`) | `"person"` | The entity the audience resolves to. Omit it — it defaults to "person", and every audience resolves to people (company filters like industry, headcount and domain resolve against people too). "company" is legacy: accepted for back-compat but stored as "person". |
 
 **Responses**
 
