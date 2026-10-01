@@ -1,7 +1,7 @@
 # Audience API-key contract
 
 Generated from the primer-platform Zod/OpenAPI source the server serves — the mechanical shape
-of the 16 API-key operations the `audience-refiner` skill and its `bin/primer` CLI drive. Do not
+of the 19 API-key operations the `audience-refiner` skill and its `bin/primer` CLI drive. Do not
 edit by hand; after the source schemas change, regenerate:
 
 ```bash
@@ -178,6 +178,80 @@ Content-Type `application/json`: { `source_criteria`, `enrichments` }.
 | `401` | Request doesn't have needed authentication parameters. Please check `Available authorizations` section here (symbol with lock on endpoint row) |  |
 | `403` | Authenticated user doesn't have access to Audience |  |
 | `404` | Audience not found | string |
+
+### `POST /audiences/{audienceId}/run`
+
+Launch a run for the audience: builds it and syncs it to its selected ad-platform destinations. Accepted with an API key or a session JWT. Because a run is a significant outbound action (it pushes to ad platforms and, on a free plan, starts the org's trial — a time-limited clock), API-key callers must send `confirm: true` in the body; a run that reshapes a live audience does not happen automatically — call this again after reshaping to push the changes to the destination.
+
+**Parameters**
+
+| In | Name | Required | Schema | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `path` | `audienceId` | yes | string |  | Audience Id |
+
+**Request Body**
+
+Content-Type `application/json`: { `confirm` }.
+| Field | Required | Schema | Default | Description |
+| --- | --- | --- | --- | --- |
+| `confirm` | no | boolean |  | Explicit acknowledgement that launching this run builds the audience and syncs it to its selected ad-platform destinations, and on a free plan starts the org's trial (a time-limited clock). Required (`true`) for API-key callers; the web app confirms in its own UI and may omit it. |
+
+**Responses**
+
+| Status | Description | Body |
+| --- | --- | --- |
+| `200` | Audience built | { `id`, `name`, `status`, `subStatus`, `isFavorite`, `isArchived`, `archivedAt`, `mode`, `type`, `shape`, `destinations`, `companies`, `people`, `lastUpdatedAt`, `submittedAt`, `hasError`, `errors`, `syncSettings`, `isAudienceRunForLatestAudienceShape`, `latestAudienceRun`, `failedSyncsProviders`, `clawbacked`, `clawbackSource`, `isLive`, `lastAdPlatformSync`, `syncedDestinations`, `confirmedDestinations`, `confirmedShapeId`, `syncsAudiences`, `hasDelayedRun`, `delayedRunSecondsRemaining` } |
+| `400` | Invalid params or payload | array<{ `code`, `expected`, `received`, `path`, `message`, `options` }> |
+| `401` | Request doesn't have needed authentication parameters. Please check `Available authorizations` section here (symbol with lock on endpoint row) |  |
+| `403` | Authenticated user doesn't have access to Audience |  |
+| `404` | Audience not found | string |
+
+### `POST /audiences/{audienceId}/run/cancel`
+
+Cancel a pending run before it dispatches (the brief delayed-run window after launch). Accepted with an API key or a session JWT.
+
+**Parameters**
+
+| In | Name | Required | Schema | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `path` | `audienceId` | yes | string |  | Audience Id |
+
+**Request Body**
+
+None.
+
+**Responses**
+
+| Status | Description | Body |
+| --- | --- | --- |
+| `204` | Audience run cancelled successfully |  |
+| `400` | Invalid params or payload | array<{ `code`, `expected`, `received`, `path`, `message`, `options` }> |
+| `401` | Request doesn't have needed authentication parameters. Please check `Available authorizations` section here (symbol with lock on endpoint row) |  |
+| `403` | Authenticated user doesn't have access to Audience |  |
+| `404` | Audience not found | string |
+| `409` | No pending run to cancel — it may have already started |  |
+
+### `GET /connections`
+
+List the org's ad-platform and CRM connections (accepted with an API key or a session JWT). Use it to see which destinations are connected before running an audience.
+
+**Parameters**
+
+| In | Name | Required | Schema | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `query` | `enabled` | no | enum(`true`, `false`) | `"true"` |  |
+
+**Request Body**
+
+None.
+
+**Responses**
+
+| Status | Description | Body |
+| --- | --- | --- |
+| `200` | List of connections | array<{ `connectionId`, `createdAt`, `updatedAt`, `syncedAt`, `isSyncing`, `providerUserId`, `providerAccountId`, `enabled`, `state`, `providerOrganizationName`, `provider`, `error` }> |
+| `400` | Invalid params or payload | array<{ `code`, `expected`, `received`, `path`, `message`, `options` }> |
+| `401` | Request doesn't have needed authentication parameters. Please check `Available authorizations` section here (symbol with lock on endpoint row) |  |
 
 ### `GET /criterias/estimate`
 

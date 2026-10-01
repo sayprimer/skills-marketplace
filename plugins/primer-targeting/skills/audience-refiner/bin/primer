@@ -311,6 +311,51 @@ def cmd_shape(args):
     run(req, args)
 
 
+def cmd_run(args):
+    """POST /audiences/:id/run — launch a run: build + sync to destinations.
+
+    This is the programmatic "Apply & Run": it builds the audience and syncs it
+    to whatever ad-platform destinations are set on it, and on a free plan it
+    starts the org's trial (a time-limited clock). It is a significant outbound
+    action, so the server requires `confirm: true` on the API-key path and this
+    verb refuses to send without --confirm.
+
+    Reshaping a live audience does NOT re-sync on its own — run again after a
+    `shape`/`update` to push the new shape to the destination."""
+    if not args.confirm:
+        raise ApiError("refusing to launch a run without --confirm — a run "
+                       "builds the audience and syncs it to its ad-platform "
+                       "destinations, and on a free plan starts the org's trial "
+                       "(a time-limited clock).")
+    req = compose("POST", args.base_url, "/audiences/%s/run" % args.audience_id,
+                  body={"confirm": True}, api_key=args.api_key)
+    run(req, args)
+
+
+def cmd_cancel(args):
+    """POST /audiences/:id/run/cancel — stop a run you just launched.
+
+    Only cancels a pending run during the brief delayed-run window after launch;
+    once the run has dispatched the server returns 409 and it can no longer be
+    stopped via the API."""
+    req = compose("POST", args.base_url,
+                  "/audiences/%s/run/cancel" % args.audience_id,
+                  api_key=args.api_key)
+    run(req, args)
+
+
+def cmd_connections(args):
+    """GET /connections — the org's ad-platform / CRM connections.
+
+    Check which destinations are connected before running: each row carries its
+    `provider` and `state` (plus the connected account's id/name). Connections
+    are established once in the Primer app via OAuth, not with an API key.
+    Defaults to enabled connections; pass --enabled false to list disabled ones."""
+    query = {"enabled": args.enabled} if args.enabled else None
+    req = compose("GET", args.base_url, "/connections", query=query, api_key=args.api_key)
+    run(req, args)
+
+
 def _estimate_request(args):
     query = {"audienceId": args.audience_id}
     if args.final:
@@ -650,6 +695,36 @@ def build_parser():
     s.add_argument("--enrichments", help="enrichments as JSON or @file.json.")
     s.add_argument("--body", help="Full body as JSON or @file.json.")
     s.set_defaults(func=cmd_shape)
+
+    # run -------------------------------------------------------------------
+    s = sub.add_parser(
+        "run",
+        help="POST /audiences/:id/run — launch a run (build + sync to "
+             "destinations). Requires --confirm.")
+    s.add_argument("audience_id")
+    s.add_argument("--confirm", action="store_true",
+                   help="Acknowledge that a run builds the audience and syncs "
+                        "it to its ad-platform destinations (and on a free plan "
+                        "starts the org's trial). Required — the server rejects "
+                        "a run without it on the API-key path.")
+    s.set_defaults(func=cmd_run)
+
+    # cancel ----------------------------------------------------------------
+    s = sub.add_parser(
+        "cancel",
+        help="POST /audiences/:id/run/cancel — stop a pending run you "
+             "launched (only during the brief post-launch window).")
+    s.add_argument("audience_id")
+    s.set_defaults(func=cmd_cancel)
+
+    # connections -----------------------------------------------------------
+    s = sub.add_parser(
+        "connections",
+        help="GET /connections — the org's ad-platform/CRM connections "
+             "(provider + state), to check before running.")
+    s.add_argument("--enabled", choices=["true", "false"],
+                   help="Filter by enabled state (server default: true).")
+    s.set_defaults(func=cmd_connections)
 
     # estimate --------------------------------------------------------------
     s = sub.add_parser("estimate",

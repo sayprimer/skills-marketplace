@@ -132,6 +132,39 @@ bin/primer update <id> --destination meta=true --destination csv=true
 > triggers an irreversible ad-audience clawback; API-key callers change
 > `destinations`/`name` only.
 
+### Step 6 — Launch it (run)
+
+Once the destinations are set and the audience is dialed in, launch it. This
+builds the audience and syncs it to those destinations — no UI step:
+
+```bash
+bin/primer run <id> --confirm
+```
+
+> **The destination must already be connected.** Ad-platform connections
+> (LinkedIn, Meta, Google, Reddit, DV360, Microsoft) are set up **once in the
+> Primer app** via OAuth — they can't be created with an API key. If you `run`
+> with a destination that isn't connected, the API rejects it (rather than
+> silently building without delivering) and names the unconnected destinations.
+> To check before running, list `bin/primer connections` and look at each row's
+> `provider` + `state` — the ad platforms (and CRMs) connected for the org.
+
+> **`run` is a significant outbound action.** It builds the audience and pushes
+> it to its ad-platform destinations, and on a free plan it starts the org's
+> trial (a time-limited clock) — so it requires `--confirm` (the CLI refuses
+> without it, and the server requires `confirm: true` on the API-key path). Only
+> run once the audit looks right and the customer has agreed to activate.
+
+> **Reshaping a live audience does not re-sync on its own.** After a later
+> `shape`/`update`, the destination keeps the previously-run shape until you
+> `run <id> --confirm` again. (Separately, if an audience is *live*, the
+> platform's dynamic-audiences processor may rebuild it on its own schedule —
+> that is downstream of this CLI; don't rely on it to push an edit promptly.)
+
+> **Changed your mind right after launching?** `bin/primer cancel <id>` stops a
+> run during the brief window before it dispatches. Once it has started building,
+> cancel returns 409 and the run can't be stopped via the API.
+
 ## Known-account / exclusion lists (ingest)
 
 To get your own rows (known customers, suppression lists, a CRM/warehouse
@@ -152,8 +185,36 @@ bin/primer ingest companies --dataset acme-accounts \
 - Body shapes: a single object, an array, `{records:[...]}`, or NDJSON. Server
   limits per request: **50k records / 10 MB**; the CLI auto-splits larger
   inputs into ≤50k batches. Data appears in Primer within ~15–60 min.
-- Then reference the dataset (by name) in an `exclusion`- or `regular`-type
-  audience. Reads stay origin-agnostic: `datasets` / `dataset-get`.
+### Targeting a pushed dataset in an audience
+
+A dataset is referenced by its **`mappingTable`**, not its name — and you can't
+construct that string, you read it back once Primer finishes importing:
+
+1. Poll `bin/primer datasets` (or `dataset-get <id>`) until your dataset — matched
+   by `name` (the `--dataset` you pushed) — shows `status: "completed"` with a
+   non-null `mappingTable`. The import runs ~15–60 min behind the push.
+2. Add one filter to the audience's `source_criteria.group.filters` carrying that
+   `mappingTable`; the `operator` decides target vs. suppress:
+
+   ```json
+   {
+     "unique_id": "<uuid>",
+     "entity_type": "company",
+     "field": "acme-accounts",
+     "operator": "is_within",
+     "values": [],
+     "dataType": "string",
+     "mappingTable": "csv.`org_21_184_202608061530_company_mapping`"
+   }
+   ```
+
+- `mappingTable` is what resolves the dataset. `operator: is_within` targets the
+  list; `exclude` suppresses it — either works in a `regular` or `exclusion`
+  audience.
+- `values` is always `[]`; `field` is only a display label. `entity_type` matches
+  the dataset; set `target_entity_type: "person"` for a buildable audience.
+- `field-values`/`find-values` don't resolve datasets — discover them via
+  `datasets`/`dataset-get` only.
 
 The static one-time CSV upload path is intentionally gone from this CLI — there
 is no `dataset-create`/`dataset-import`/`dataset-delete`; everything goes
@@ -189,6 +250,9 @@ shape of each endpoint; this is the map from what you type to what it calls.
 | `get` | `GET /audiences/:id` |
 | `update` | `PATCH /audiences/:id` |
 | `shape` | `POST /audiences/:id/shape` |
+| `run` | `POST /audiences/:id/run` (build + sync; needs `--confirm`) |
+| `cancel` | `POST /audiences/:id/run/cancel` (stop a pending run) |
+| `connections` | `GET /connections` (connected ad platforms / CRMs + state) |
 | `estimate [--poll]` | `GET /criterias/estimate` |
 | `audit` | client-side title/seniority audit over the estimate |
 | `field-values` | `GET /filters/field-values` |
