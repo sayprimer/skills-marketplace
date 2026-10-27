@@ -62,6 +62,11 @@ bin/primer field-values industry --q insurance
 bin/primer find-values job_title --value "VP Marketing" --value "CMO"
 ```
 
+Resolve only values that are new to you. Values already saved in an audience's
+criteria came from a successful shape, so don't re-resolve them when you
+re-shape — look up just the values you're adding. `find-values` takes many
+values per call (repeat `--value`, or `--values-json @values.json`).
+
 Use these to assemble a `source_criteria` object:
 `{ target_entity_type, group{ operator, filters[], group_unique_id } }`.
 Set `target_entity_type` to `person`, also for an account list. An audience
@@ -211,6 +216,10 @@ construct that string, you read it back once Primer finishes importing:
 - `mappingTable` is what resolves the dataset. `operator: is_within` targets the
   list; `exclude` suppresses it — either works in a `regular` or `exclusion`
   audience.
+- **A list you refresh on a schedule belongs in a dataset, not in a `domain`
+  filter.** Re-push the same `--dataset` name on each refresh and point the
+  audience at it once. The criteria never change, so there's nothing to
+  re-resolve or re-shape, and no new dataset name to swap in or delete.
 - `values` is always `[]`; `field` is only a display label. `entity_type` matches
   the dataset; set `target_entity_type: "person"` for a buildable audience.
 - `field-values`/`find-values` don't resolve datasets — discover them via

@@ -56,7 +56,7 @@ None.
 
 **Request Body**
 
-Content-Type `application/json`: { `name`, `destinations`, `source_criteria`, `initial`, `chat_id`, `type` }.
+Content-Type `application/json`: { `name`, `destinations`, `source_criteria`, `initial`, `chat_id`, `type`, `entity_type` }.
 | Field | Required | Schema | Default | Description |
 | --- | --- | --- | --- | --- |
 | `chat_id` | no | string |  | Chat ID to link with this audience when the chat was started before the audience existed |
@@ -69,13 +69,14 @@ Content-Type `application/json`: { `name`, `destinations`, `source_criteria`, `i
 | `destinations.microsoft` | no | boolean |  | Indicates whether Microsoft Ads is selected as a destination for the audience. |
 | `destinations.reddit` | no | boolean |  | Indicates whether Reddit is selected as a destination for the audience. |
 | `destinations.salesforce` | no | boolean |  | Indicates whether Salesforce is selected as a destination for the audience. |
+| `entity_type` | no | enum(`company`, `person`) | `"person"` | What the audience lists: `person` (default) or `company`. |
 | `initial` | no | { `source_criteria`, `estimate` } \| null |  | The previous shape of the audience. |
 | `initial.estimate` | no | { `people_count`, `companies_count`, `heuristics`, `match_rate`, `preview` } \| null |  | The previous estimate of the audience. |
 | `initial.source_criteria` | no | { `target_entity_type`, `group` } \| null |  | The previous source criteria of the audience. |
 | `name` | no | string |  | The name of the new audience. |
 | `source_criteria` | no | { `target_entity_type`, `group` } \| null |  | The source criteria of the audience. |
 | `source_criteria.group` | no | { `operator`, `filters`, `group_unique_id` } \| null |  | Main group of the audience |
-| `source_criteria.target_entity_type` | no | enum(`company`, `person`) | `"person"` | The entity the audience resolves to. Omit it — it defaults to "person", and every audience resolves to people (company filters like industry, headcount and domain resolve against people too). "company" is legacy: accepted for back-compat but stored as "person". |
+| `source_criteria.target_entity_type` | no | enum(`company`, `person`) | `"person"` | The entity the criteria resolve to. On an audience, the audience's `entity_type` applies. |
 | `type` | no | enum(`regular`, `exclusion`, `conversion_report`) | `"regular"` | Type of audience to create. |
 
 **Responses**
@@ -106,7 +107,7 @@ None.
 
 | Status | Description | Body |
 | --- | --- | --- |
-| `200` | Audience retrieved with data. | { `id`, `name`, `status`, `subStatus`, `isFavorite`, `isArchived`, `archivedAt`, `mode`, `type`, `shape`, `destinations`, `companies`, `people`, `lastUpdatedAt`, `submittedAt`, `hasError`, `errors`, `syncSettings`, `isAudienceRunForLatestAudienceShape`, `latestAudienceRun`, `failedSyncsProviders`, `clawbacked`, `clawbackSource`, `isLive`, `lastAdPlatformSync`, `syncedDestinations`, `confirmedDestinations`, `confirmedShapeId`, `syncsAudiences`, `hasDelayedRun`, `delayedRunSecondsRemaining` } |
+| `200` | Audience retrieved with data. | { `id`, `name`, `status`, `subStatus`, `isFavorite`, `isArchived`, `archivedAt`, `mode`, `type`, `entity_type`, `shape`, `destinations`, `companies`, `people`, `lastUpdatedAt`, `submittedAt`, `hasError`, `errors`, `syncSettings`, `isAudienceRunForLatestAudienceShape`, `latestAudienceRun`, `failedSyncsProviders`, `clawbacked`, `clawbackSource`, `isLive`, `lastAdPlatformSync`, `syncedDestinations`, `confirmedDestinations`, `confirmedShapeId`, `syncsAudiences`, `hasDelayedRun`, `delayedRunSecondsRemaining`, `delayedRunTotalSeconds` } |
 | `400` | Invalid params or payload | array<{ `code`, `expected`, `received`, `path`, `message`, `options` }> |
 | `401` | Request doesn't have needed authentication parameters. Please check `Available authorizations` section here (symbol with lock on endpoint row) |  |
 | `403` | Authenticated user doesn't have access to Audience |  |
@@ -143,7 +144,7 @@ Content-Type `application/json`: The updatable fields of an audience: its name, 
 
 | Status | Description | Body |
 | --- | --- | --- |
-| `200` | The updated audience. | { `id`, `name`, `status`, `subStatus`, `isFavorite`, `isArchived`, `archivedAt`, `mode`, `type`, `shape`, `destinations`, `companies`, `people`, `lastUpdatedAt`, `submittedAt`, `hasError`, `errors`, `syncSettings`, `isAudienceRunForLatestAudienceShape`, `latestAudienceRun`, `failedSyncsProviders`, `clawbacked`, `clawbackSource`, `isLive`, `lastAdPlatformSync`, `syncedDestinations`, `confirmedDestinations`, `confirmedShapeId`, `syncsAudiences`, `hasDelayedRun`, `delayedRunSecondsRemaining` } |
+| `200` | The updated audience. | { `id`, `name`, `status`, `subStatus`, `isFavorite`, `isArchived`, `archivedAt`, `mode`, `type`, `entity_type`, `shape`, `destinations`, `companies`, `people`, `lastUpdatedAt`, `submittedAt`, `hasError`, `errors`, `syncSettings`, `isAudienceRunForLatestAudienceShape`, `latestAudienceRun`, `failedSyncsProviders`, `clawbacked`, `clawbackSource`, `isLive`, `lastAdPlatformSync`, `syncedDestinations`, `confirmedDestinations`, `confirmedShapeId`, `syncsAudiences`, `hasDelayedRun`, `delayedRunSecondsRemaining`, `delayedRunTotalSeconds` } |
 | `400` | Invalid params or payload | array<{ `code`, `expected`, `received`, `path`, `message`, `options` }> |
 | `401` | Request doesn't have needed authentication parameters. Please check `Available authorizations` section here (symbol with lock on endpoint row) |  |
 | `403` | Authenticated user doesn't have access to Audience |  |
@@ -167,7 +168,7 @@ Content-Type `application/json`: { `source_criteria`, `enrichments` }.
 | `enrichments` | no | any \| null |  | Optional enrichment selections for the shape. Currently unused by the server; may be omitted. |
 | `source_criteria` | no | { `target_entity_type`, `group` } |  | The filter criteria that define the new shape. |
 | `source_criteria.group` | no | { `operator`, `filters`, `group_unique_id` } \| null |  | Main group of the audience |
-| `source_criteria.target_entity_type` | no | enum(`company`, `person`) | `"person"` | The entity the audience resolves to. Omit it — it defaults to "person", and every audience resolves to people (company filters like industry, headcount and domain resolve against people too). "company" is legacy: accepted for back-compat but stored as "person". |
+| `source_criteria.target_entity_type` | no | enum(`company`, `person`) | `"person"` | The entity the criteria resolve to. On an audience, the audience's `entity_type` applies. |
 
 **Responses**
 
@@ -200,7 +201,7 @@ Content-Type `application/json`: { `confirm` }.
 
 | Status | Description | Body |
 | --- | --- | --- |
-| `200` | Audience built | { `id`, `name`, `status`, `subStatus`, `isFavorite`, `isArchived`, `archivedAt`, `mode`, `type`, `shape`, `destinations`, `companies`, `people`, `lastUpdatedAt`, `submittedAt`, `hasError`, `errors`, `syncSettings`, `isAudienceRunForLatestAudienceShape`, `latestAudienceRun`, `failedSyncsProviders`, `clawbacked`, `clawbackSource`, `isLive`, `lastAdPlatformSync`, `syncedDestinations`, `confirmedDestinations`, `confirmedShapeId`, `syncsAudiences`, `hasDelayedRun`, `delayedRunSecondsRemaining` } |
+| `200` | Audience built | { `id`, `name`, `status`, `subStatus`, `isFavorite`, `isArchived`, `archivedAt`, `mode`, `type`, `entity_type`, `shape`, `destinations`, `companies`, `people`, `lastUpdatedAt`, `submittedAt`, `hasError`, `errors`, `syncSettings`, `isAudienceRunForLatestAudienceShape`, `latestAudienceRun`, `failedSyncsProviders`, `clawbacked`, `clawbackSource`, `isLive`, `lastAdPlatformSync`, `syncedDestinations`, `confirmedDestinations`, `confirmedShapeId`, `syncsAudiences`, `hasDelayedRun`, `delayedRunSecondsRemaining`, `delayedRunTotalSeconds` } |
 | `400` | Invalid params or payload | array<{ `code`, `expected`, `received`, `path`, `message`, `options` }> |
 | `401` | Request doesn't have needed authentication parameters. Please check `Available authorizations` section here (symbol with lock on endpoint row) |  |
 | `403` | Authenticated user doesn't have access to Audience |  |
@@ -263,6 +264,7 @@ Get the current estimate for an audience
 | --- | --- | --- | --- | --- | --- |
 | `query` | `audienceId` | no | string \| null |  | Audience Id |
 | `query` | `isFinalCall` | no | boolean \| null |  | Is final polling call |
+| `query` | `entityType` | no | enum(`company`, `person`) | `"person"` | Without an audience: what the empty criteria describe, `person` (default) or `company`. With an audience, the audience's own applies. |
 
 **Request Body**
 
@@ -272,7 +274,7 @@ None.
 
 | Status | Description | Body |
 | --- | --- | --- |
-| `200` | Current audience estimate | { `people_count`, `companies_count`, `preview`, `match_rate`, `heuristics`, `started_at`, `finished_at` } |
+| `200` | Current audience estimate | { `people_count`, `companies_count`, `preview`, `unified_preview_ready`, `pending_assets`, `estimate_error`, `match_rate`, `heuristics`, `started_at`, `finished_at` } |
 | `401` | Request doesn't have needed authentication parameters. Please check `Available authorizations` section here (symbol with lock on endpoint row) |  |
 | `404` | Audience or estimate not found not found | string |
 
@@ -308,9 +310,9 @@ Get the list of possible field values
 
 | In | Name | Required | Schema | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `query` | `fieldId` | yes | enum(`person_location`, `company_location`, `domain`, `industry`, `keywords`, `technologies`, `departments`, `job_title`, `seniority`, `annual_revenue`, `founded_year`, `headcount`, `csv`, `naics_code`, `skills`, `majors`, `degrees`, `last_seen`, `first_seen`, `last_form_submission`, `num_visits`, `session_time`, `num_form_fills`, `form_name`, `latest_page_url`, `referrer_domain`, `device_type`, `browser`, `utm_source`, `utm_medium`, `utm_term`, `utm_content`, `utm_campaign`, `first_utm_source`, `first_utm_medium`, `first_utm_campaign`, `first_utm_term`, `first_utm_content`, `all_utm_source`, `all_utm_medium`, `all_utm_campaign`, `all_utm_term`, `all_utm_content`, `first_page_url`, `all_pages_visited`, `intent_level`, `traffic_type`, `audience_membership`, `person_name`, `company_account_type`) |  | Requested field identifier. |
+| `query` | `fieldId` | yes | enum(`person_location`, `company_location`, `domain`, `industry`, `keywords`, `technologies`, `departments`, `job_title`, `seniority`, `annual_revenue`, `founded_year`, `headcount`, `csv`, `naics_code`, `skills`, `majors`, `degrees`, `last_seen`, `first_seen`, `last_form_submission`, `num_visits`, `session_time`, `num_form_fills`, `form_name`, `latest_page_url`, `referrer_domain`, `device_type`, `browser`, `utm_source`, `utm_medium`, `utm_term`, `utm_content`, `utm_campaign`, `first_utm_source`, `first_utm_medium`, `first_utm_campaign`, `first_utm_term`, `first_utm_content`, `all_utm_source`, `all_utm_medium`, `all_utm_campaign`, `all_utm_term`, `all_utm_content`, `first_page_url`, `all_pages_visited`, `intent_level`, `traffic_type`, `audience_membership`, `person_name`, `company_account_type`, `deal_name`, `deal_amount`, `deal_stage`, `deal_type`, `deal_is_closed`, `deal_is_won`, `deal_created_date`, `deal_close_date`) |  | Requested field identifier. |
 | `query` | `q` | no | string | `""` | Query string. |
-| `query` | `limit` | no | string | `"250"` | How many entries should be returned. |
+| `query` | `limit` | no | integer | `250` | How many entries should be returned. |
 
 **Request Body**
 
@@ -338,7 +340,7 @@ None.
 Content-Type `application/json`: { `fieldId`, `values` }.
 | Field | Required | Schema | Default | Description |
 | --- | --- | --- | --- | --- |
-| `fieldId` | yes | enum(`person_location`, `company_location`, `domain`, `industry`, `keywords`, `technologies`, `departments`, `job_title`, `seniority`, `annual_revenue`, `founded_year`, `headcount`, `csv`, `naics_code`, `skills`, `majors`, `degrees`, `last_seen`, `first_seen`, `last_form_submission`, `num_visits`, `session_time`, `num_form_fills`, `form_name`, `latest_page_url`, `referrer_domain`, `device_type`, `browser`, `utm_source`, `utm_medium`, `utm_term`, `utm_content`, `utm_campaign`, `first_utm_source`, `first_utm_medium`, `first_utm_campaign`, `first_utm_term`, `first_utm_content`, `all_utm_source`, `all_utm_medium`, `all_utm_campaign`, `all_utm_term`, `all_utm_content`, `first_page_url`, `all_pages_visited`, `intent_level`, `traffic_type`, `audience_membership`, `person_name`, `company_account_type`) |  | Requested field identifier. |
+| `fieldId` | yes | enum(`person_location`, `company_location`, `domain`, `industry`, `keywords`, `technologies`, `departments`, `job_title`, `seniority`, `annual_revenue`, `founded_year`, `headcount`, `csv`, `naics_code`, `skills`, `majors`, `degrees`, `last_seen`, `first_seen`, `last_form_submission`, `num_visits`, `session_time`, `num_form_fills`, `form_name`, `latest_page_url`, `referrer_domain`, `device_type`, `browser`, `utm_source`, `utm_medium`, `utm_term`, `utm_content`, `utm_campaign`, `first_utm_source`, `first_utm_medium`, `first_utm_campaign`, `first_utm_term`, `first_utm_content`, `all_utm_source`, `all_utm_medium`, `all_utm_campaign`, `all_utm_term`, `all_utm_content`, `first_page_url`, `all_pages_visited`, `intent_level`, `traffic_type`, `audience_membership`, `person_name`, `company_account_type`, `deal_name`, `deal_amount`, `deal_stage`, `deal_type`, `deal_is_closed`, `deal_is_won`, `deal_created_date`, `deal_close_date`) |  | Requested field identifier. |
 | `values` | yes | array<string> |  | The list of values to search for within the field's known values. |
 
 **Responses**
@@ -441,7 +443,10 @@ Import dataset
 
 **Request Body**
 
-None.
+Content-Type `application/json`: { `chatId` }.
+| Field | Required | Schema | Default | Description |
+| --- | --- | --- | --- | --- |
+| `chatId` | no | string |  | The caller's chat the import was started from; chat follows it and posts a summary there once it finishes. |
 
 **Responses**
 

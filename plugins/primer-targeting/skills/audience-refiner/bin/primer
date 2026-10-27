@@ -35,6 +35,9 @@ import urllib.parse
 import urllib.request
 
 DEFAULT_TIMEOUT = 60
+# Sent as `User-Agent: primer-cli/<version>`; keep equal to plugin.json `version`
+# (a test enforces it).
+CLI_VERSION = "1.4.0"
 # Primer's multi-tenant production host, used when nothing overrides it.
 # Resolution order is --base-url > PRIMER_API_BASE_URL > this default, so a
 # dedicated/regional deployment (or internal validation against another
@@ -96,6 +99,7 @@ def compose(method, base_url, path, query=None, body=None, api_key=None):
     headers = {
         "Authorization": "Bearer " + (api_key or ""),
         "Accept": "application/json",
+        "User-Agent": "primer-cli/%s" % CLI_VERSION,
     }
     if body is not None:
         headers["Content-Type"] = "application/json"
