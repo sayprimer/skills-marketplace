@@ -37,7 +37,7 @@ import urllib.request
 DEFAULT_TIMEOUT = 60
 # Sent as `User-Agent: primer-cli/<version>`; keep equal to plugin.json `version`
 # (a test enforces it).
-CLI_VERSION = "1.4.0"
+CLI_VERSION = "1.4.1"
 # Primer's multi-tenant production host, used when nothing overrides it.
 # Resolution order is --base-url > PRIMER_API_BASE_URL > this default, so a
 # dedicated/regional deployment (or internal validation against another
@@ -55,7 +55,7 @@ ENTITY_TYPES = ["company", "person"]
 # Ad/export destinations. `destinations` is a JSON OBJECT of booleans, not an
 # array (a corrected contract drift item).
 DESTINATION_KEYS = [
-    "meta", "google", "linkedIn", "reddit", "dv360", "microsoft", "salesforce", "csv",
+    "meta", "google", "linkedIn", "reddit", "dv360", "microsoft", "twitter", "salesforce", "csv",
 ]
 PREVIEW_OFFSET_MAX = 225  # value cap on estimate/preview offset.
 
