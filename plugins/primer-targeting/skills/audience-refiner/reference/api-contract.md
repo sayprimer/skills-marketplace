@@ -60,7 +60,7 @@ Content-Type `application/json`: { `name`, `destinations`, `source_criteria`, `i
 | Field | Required | Schema | Default | Description |
 | --- | --- | --- | --- | --- |
 | `chat_id` | no | string |  | Chat ID to link with this audience when the chat was started before the audience existed |
-| `destinations` | no | { `meta`, `google`, `linkedIn`, `reddit`, `dv360`, `microsoft`, `salesforce`, `csv` } | `{}` | Specifies the destinations for the audience, detailing where the audience data is utilized or exported. |
+| `destinations` | no | { `meta`, `google`, `linkedIn`, `reddit`, `dv360`, `microsoft`, `twitter`, `salesforce`, `csv` } | `{}` | Specifies the destinations for the audience, detailing where the audience data is utilized or exported. |
 | `destinations.csv` | no | boolean |  | Indicates whether CSV export is selected as a destination for the audience. |
 | `destinations.dv360` | no | boolean |  | Indicates whether DV360 is selected as a destination for the audience. |
 | `destinations.google` | no | boolean |  | Indicates whether Google is selected as a destination for the audience. |
@@ -69,6 +69,7 @@ Content-Type `application/json`: { `name`, `destinations`, `source_criteria`, `i
 | `destinations.microsoft` | no | boolean |  | Indicates whether Microsoft Ads is selected as a destination for the audience. |
 | `destinations.reddit` | no | boolean |  | Indicates whether Reddit is selected as a destination for the audience. |
 | `destinations.salesforce` | no | boolean |  | Indicates whether Salesforce is selected as a destination for the audience. |
+| `destinations.twitter` | no | boolean |  | Indicates whether X Ads is selected as a destination for the audience. |
 | `entity_type` | no | enum(`company`, `person`) | `"person"` | What the audience lists: `person` (default) or `company`. |
 | `initial` | no | { `source_criteria`, `estimate` } \| null |  | The previous shape of the audience. |
 | `initial.estimate` | no | { `people_count`, `companies_count`, `heuristics`, `match_rate`, `preview` } \| null |  | The previous estimate of the audience. |
@@ -115,7 +116,7 @@ None.
 
 ### `PATCH /audiences/{audienceId}`
 
-Update audience properties (name, destinations, or archived flag). Returns the updated audience. Note: setting `archived: true` triggers an irreversible ad-audience clawback; API-key callers should send only `destinations`.
+Update audience properties (name, destinations, archived flag, or saved flag). Returns the updated audience. Note: setting `archived: true` triggers an irreversible ad-audience clawback; API-key callers should send only `destinations`.
 
 **Parameters**
 
@@ -125,11 +126,11 @@ Update audience properties (name, destinations, or archived flag). Returns the u
 
 **Request Body**
 
-Content-Type `application/json`: The updatable fields of an audience: its name, archived flag, and destinations.
+Content-Type `application/json`: The updatable fields of an audience: its name, archived flag, destinations, and saved flag.
 | Field | Required | Schema | Default | Description |
 | --- | --- | --- | --- | --- |
 | `archived` | no | boolean |  | When true, archives the audience; when false, unarchives it. Archiving triggers an irreversible ad-audience clawback, so API-key callers should send only `destinations` and omit this field. |
-| `destinations` | no | { `meta`, `google`, `linkedIn`, `reddit`, `dv360`, `microsoft`, `salesforce`, `csv` } |  | Specifies the destinations for the audience, detailing where the audience data is utilized or exported. |
+| `destinations` | no | { `meta`, `google`, `linkedIn`, `reddit`, `dv360`, `microsoft`, `twitter`, `salesforce`, `csv` } |  | Specifies the destinations for the audience, detailing where the audience data is utilized or exported. |
 | `destinations.csv` | no | boolean |  | Indicates whether CSV export is selected as a destination for the audience. |
 | `destinations.dv360` | no | boolean |  | Indicates whether DV360 is selected as a destination for the audience. |
 | `destinations.google` | no | boolean |  | Indicates whether Google is selected as a destination for the audience. |
@@ -138,7 +139,9 @@ Content-Type `application/json`: The updatable fields of an audience: its name, 
 | `destinations.microsoft` | no | boolean |  | Indicates whether Microsoft Ads is selected as a destination for the audience. |
 | `destinations.reddit` | no | boolean |  | Indicates whether Reddit is selected as a destination for the audience. |
 | `destinations.salesforce` | no | boolean |  | Indicates whether Salesforce is selected as a destination for the audience. |
+| `destinations.twitter` | no | boolean |  | Indicates whether X Ads is selected as a destination for the audience. |
 | `name` | no | string |  | The new name for the audience. |
+| `saved` | no | boolean |  | When true, moves a draft audience to saved: kept for preview and CSV export but never built or synced until it is run. A saved audience stays saved until it is run, so false changes nothing. Only a draft or saved audience accepts true. |
 
 **Responses**
 

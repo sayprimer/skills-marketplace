@@ -147,7 +147,7 @@ bin/primer run <id> --confirm
 ```
 
 > **The destination must already be connected.** Ad-platform connections
-> (LinkedIn, Meta, Google, Reddit, DV360, Microsoft) are set up **once in the
+> (LinkedIn, Meta, Google, Reddit, DV360, Microsoft, X) are set up **once in the
 > Primer app** via OAuth — they can't be created with an API key. If you `run`
 > with a destination that isn't connected, the API rejects it (rather than
 > silently building without delivering) and names the unconnected destinations.
