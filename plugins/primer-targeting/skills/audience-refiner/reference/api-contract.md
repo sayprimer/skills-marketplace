@@ -59,9 +59,9 @@ None.
 Content-Type `application/json`: { `name`, `destinations`, `source_criteria`, `initial`, `chat_id`, `chat_answer`, `type`, `entity_type` }.
 | Field | Required | Schema | Default | Description |
 | --- | --- | --- | --- | --- |
-| `chat_answer` | no | { `chat_id`, `message_id` } |  | The chat list answer this audience is saved from; one audience per answer and type |
+| `chat_answer` | no | { `chat_id`, `message_id`, `list` } |  | The chat list answer this audience is saved from, and `list`, which of its separate lists; one audience per list and type |
 | `chat_id` | no | string |  | Chat ID to link with this audience when the chat was started before the audience existed |
-| `destinations` | no | { `meta`, `google`, `linkedIn`, `reddit`, `dv360`, `microsoft`, `twitter`, `salesforce`, `csv` } | `{}` | Specifies the destinations for the audience, detailing where the audience data is utilized or exported. |
+| `destinations` | no | { `meta`, `google`, `linkedIn`, `reddit`, `dv360`, `microsoft`, `twitter`, `salesforce`, `csv`, `slack` } | `{}` | Specifies the destinations for the audience, detailing where the audience data is utilized or exported. |
 | `destinations.csv` | no | boolean |  | Indicates whether CSV export is selected as a destination for the audience. |
 | `destinations.dv360` | no | boolean |  | Indicates whether DV360 is selected as a destination for the audience. |
 | `destinations.google` | no | boolean |  | Indicates whether Google is selected as a destination for the audience. |
@@ -70,6 +70,7 @@ Content-Type `application/json`: { `name`, `destinations`, `source_criteria`, `i
 | `destinations.microsoft` | no | boolean |  | Indicates whether Microsoft Ads is selected as a destination for the audience. |
 | `destinations.reddit` | no | boolean |  | Indicates whether Reddit is selected as a destination for the audience. |
 | `destinations.salesforce` | no | boolean |  | Indicates whether Salesforce is selected as a destination for the audience. |
+| `destinations.slack` | no | boolean |  | Indicates whether hourly Slack alerts on the audience's high-intent visitors are selected. Slack is never built or synced. |
 | `destinations.twitter` | no | boolean |  | Indicates whether X Ads is selected as a destination for the audience. |
 | `entity_type` | no | enum(`company`, `person`) | `"person"` | What the audience lists: `person` (default) or `company`. |
 | `initial` | no | { `source_criteria`, `estimate` } \| null |  | The previous shape of the audience. |
@@ -79,7 +80,7 @@ Content-Type `application/json`: { `name`, `destinations`, `source_criteria`, `i
 | `source_criteria` | no | { `target_entity_type`, `group` } \| null |  | The source criteria of the audience. |
 | `source_criteria.group` | no | { `operator`, `filters`, `group_unique_id` } \| null |  | Main group of the audience |
 | `source_criteria.target_entity_type` | no | enum(`company`, `person`) | `"person"` | The entity the criteria resolve to. On an audience, the audience's `entity_type` applies. |
-| `type` | no | enum(`regular`, `exclusion`, `conversion_report`) | `"regular"` | Type of audience to create. |
+| `type` | no | enum(`regular`, `exclusion`) | `"regular"` | Type of audience to create. |
 
 **Responses**
 
@@ -110,7 +111,7 @@ None.
 
 | Status | Description | Body |
 | --- | --- | --- |
-| `200` | Audience retrieved with data. | { `id`, `name`, `status`, `subStatus`, `isFavorite`, `isArchived`, `archivedAt`, `mode`, `type`, `entity_type`, `shape`, `destinations`, `companies`, `people`, `lastUpdatedAt`, `submittedAt`, `hasError`, `errors`, `syncSettings`, `isAudienceRunForLatestAudienceShape`, `latestAudienceRun`, `failedSyncsProviders`, `clawbacked`, `clawbackSource`, `isLive`, `lastAdPlatformSync`, `syncedDestinations`, `confirmedDestinations`, `confirmedShapeId`, `syncsAudiences`, `hasDelayedRun`, `delayedRunSecondsRemaining`, `delayedRunTotalSeconds` } |
+| `200` | Audience retrieved with data. | { `id`, `name`, `status`, `subStatus`, `isFavorite`, `isArchived`, `archivedAt`, `mode`, `type`, `entity_type`, `shape`, `destinations`, `companies`, `people`, `lastUpdatedAt`, `submittedAt`, `hasError`, `errors`, `syncSettings`, `isAudienceRunForLatestAudienceShape`, `latestAudienceRun`, `failedSyncsProviders`, `clawbacked`, `clawbackSource`, `isLive`, `lastAdPlatformSync`, `syncedDestinations`, `confirmedDestinations`, `confirmedShapeId`, `slackChannelId`, `slackAlertFrequency`, `syncsAudiences`, `hasDelayedRun`, `delayedRunSecondsRemaining`, `delayedRunTotalSeconds` } |
 | `400` | Invalid params or payload | array<{ `code`, `expected`, `received`, `path`, `message`, `options` }> |
 | `401` | Request doesn't have needed authentication parameters. Please check `Available authorizations` section here (symbol with lock on endpoint row) |  |
 | `403` | Authenticated user doesn't have access to Audience |  |
@@ -128,11 +129,11 @@ Update audience properties (name, destinations, archived flag, or saved flag). R
 
 **Request Body**
 
-Content-Type `application/json`: The updatable fields of an audience: its name, archived flag, destinations, and saved flag.
+Content-Type `application/json`: The updatable fields of an audience: its name, archived flag, destinations, saved flag and Slack alert settings.
 | Field | Required | Schema | Default | Description |
 | --- | --- | --- | --- | --- |
 | `archived` | no | boolean |  | When true, archives the audience; when false, unarchives it. Archiving triggers an irreversible ad-audience clawback, so API-key callers should send only `destinations` and omit this field. |
-| `destinations` | no | { `meta`, `google`, `linkedIn`, `reddit`, `dv360`, `microsoft`, `twitter`, `salesforce`, `csv` } |  | Specifies the destinations for the audience, detailing where the audience data is utilized or exported. |
+| `destinations` | no | { `meta`, `google`, `linkedIn`, `reddit`, `dv360`, `microsoft`, `twitter`, `salesforce`, `csv`, `slack` } |  | Specifies the destinations for the audience, detailing where the audience data is utilized or exported. |
 | `destinations.csv` | no | boolean |  | Indicates whether CSV export is selected as a destination for the audience. |
 | `destinations.dv360` | no | boolean |  | Indicates whether DV360 is selected as a destination for the audience. |
 | `destinations.google` | no | boolean |  | Indicates whether Google is selected as a destination for the audience. |
@@ -141,15 +142,18 @@ Content-Type `application/json`: The updatable fields of an audience: its name, 
 | `destinations.microsoft` | no | boolean |  | Indicates whether Microsoft Ads is selected as a destination for the audience. |
 | `destinations.reddit` | no | boolean |  | Indicates whether Reddit is selected as a destination for the audience. |
 | `destinations.salesforce` | no | boolean |  | Indicates whether Salesforce is selected as a destination for the audience. |
+| `destinations.slack` | no | boolean |  | Indicates whether hourly Slack alerts on the audience's high-intent visitors are selected. Slack is never built or synced. |
 | `destinations.twitter` | no | boolean |  | Indicates whether X Ads is selected as a destination for the audience. |
 | `name` | no | string |  | The new name for the audience. |
 | `saved` | no | boolean |  | When true, moves a draft audience to saved: kept for preview and CSV export but never built or synced until it is run. A saved audience stays saved until it is run, so false changes nothing. Only a draft or saved audience accepts true. |
+| `slack_alert_frequency` | no | enum(`first_time`, `every_time`) |  | How often the audience's Slack alerts repeat: `first_time` alerts once ever per person (or company), `every_time` once per day of activity, on the day's earliest activity. |
+| `slack_channel_id` | no | string \| null |  | The Slack channel the audience's alerts post to. Primer's Slack app joins it on save. Required while Slack is a destination, so null is refused then. |
 
 **Responses**
 
 | Status | Description | Body |
 | --- | --- | --- |
-| `200` | The updated audience. | { `id`, `name`, `status`, `subStatus`, `isFavorite`, `isArchived`, `archivedAt`, `mode`, `type`, `entity_type`, `shape`, `destinations`, `companies`, `people`, `lastUpdatedAt`, `submittedAt`, `hasError`, `errors`, `syncSettings`, `isAudienceRunForLatestAudienceShape`, `latestAudienceRun`, `failedSyncsProviders`, `clawbacked`, `clawbackSource`, `isLive`, `lastAdPlatformSync`, `syncedDestinations`, `confirmedDestinations`, `confirmedShapeId`, `syncsAudiences`, `hasDelayedRun`, `delayedRunSecondsRemaining`, `delayedRunTotalSeconds` } |
+| `200` | The updated audience. | { `id`, `name`, `status`, `subStatus`, `isFavorite`, `isArchived`, `archivedAt`, `mode`, `type`, `entity_type`, `shape`, `destinations`, `companies`, `people`, `lastUpdatedAt`, `submittedAt`, `hasError`, `errors`, `syncSettings`, `isAudienceRunForLatestAudienceShape`, `latestAudienceRun`, `failedSyncsProviders`, `clawbacked`, `clawbackSource`, `isLive`, `lastAdPlatformSync`, `syncedDestinations`, `confirmedDestinations`, `confirmedShapeId`, `slackChannelId`, `slackAlertFrequency`, `syncsAudiences`, `hasDelayedRun`, `delayedRunSecondsRemaining`, `delayedRunTotalSeconds` } |
 | `400` | Invalid params or payload | array<{ `code`, `expected`, `received`, `path`, `message`, `options` }> |
 | `401` | Request doesn't have needed authentication parameters. Please check `Available authorizations` section here (symbol with lock on endpoint row) |  |
 | `403` | Authenticated user doesn't have access to Audience |  |
@@ -206,7 +210,7 @@ Content-Type `application/json`: { `confirm` }.
 
 | Status | Description | Body |
 | --- | --- | --- |
-| `200` | Audience built | { `id`, `name`, `status`, `subStatus`, `isFavorite`, `isArchived`, `archivedAt`, `mode`, `type`, `entity_type`, `shape`, `destinations`, `companies`, `people`, `lastUpdatedAt`, `submittedAt`, `hasError`, `errors`, `syncSettings`, `isAudienceRunForLatestAudienceShape`, `latestAudienceRun`, `failedSyncsProviders`, `clawbacked`, `clawbackSource`, `isLive`, `lastAdPlatformSync`, `syncedDestinations`, `confirmedDestinations`, `confirmedShapeId`, `syncsAudiences`, `hasDelayedRun`, `delayedRunSecondsRemaining`, `delayedRunTotalSeconds` } |
+| `200` | Audience built | { `id`, `name`, `status`, `subStatus`, `isFavorite`, `isArchived`, `archivedAt`, `mode`, `type`, `entity_type`, `shape`, `destinations`, `companies`, `people`, `lastUpdatedAt`, `submittedAt`, `hasError`, `errors`, `syncSettings`, `isAudienceRunForLatestAudienceShape`, `latestAudienceRun`, `failedSyncsProviders`, `clawbacked`, `clawbackSource`, `isLive`, `lastAdPlatformSync`, `syncedDestinations`, `confirmedDestinations`, `confirmedShapeId`, `slackChannelId`, `slackAlertFrequency`, `syncsAudiences`, `hasDelayedRun`, `delayedRunSecondsRemaining`, `delayedRunTotalSeconds` } |
 | `400` | Invalid params or payload | array<{ `code`, `expected`, `received`, `path`, `message`, `options` }> |
 | `401` | Request doesn't have needed authentication parameters. Please check `Available authorizations` section here (symbol with lock on endpoint row) |  |
 | `403` | Authenticated user doesn't have access to Audience |  |
