@@ -114,7 +114,6 @@ None.
 | `200` | Audience retrieved with data. | { `id`, `name`, `status`, `subStatus`, `isFavorite`, `isArchived`, `archivedAt`, `mode`, `type`, `entity_type`, `shape`, `destinations`, `companies`, `people`, `lastUpdatedAt`, `submittedAt`, `hasError`, `errors`, `syncSettings`, `isAudienceRunForLatestAudienceShape`, `latestAudienceRun`, `failedSyncsProviders`, `clawbacked`, `clawbackSource`, `isLive`, `lastAdPlatformSync`, `syncedDestinations`, `confirmedDestinations`, `confirmedShapeId`, `slackChannelId`, `slackAlertFrequency`, `syncsAudiences`, `hasDelayedRun`, `delayedRunSecondsRemaining`, `delayedRunTotalSeconds` } |
 | `400` | Invalid params or payload | array<{ `code`, `expected`, `received`, `path`, `message`, `options` }> |
 | `401` | Request doesn't have needed authentication parameters. Please check `Available authorizations` section here (symbol with lock on endpoint row) |  |
-| `403` | Authenticated user doesn't have access to Audience |  |
 | `404` | Audience not found | string |
 
 ### `PATCH /audiences/{audienceId}`
@@ -156,7 +155,7 @@ Content-Type `application/json`: The updatable fields of an audience: its name, 
 | `200` | The updated audience. | { `id`, `name`, `status`, `subStatus`, `isFavorite`, `isArchived`, `archivedAt`, `mode`, `type`, `entity_type`, `shape`, `destinations`, `companies`, `people`, `lastUpdatedAt`, `submittedAt`, `hasError`, `errors`, `syncSettings`, `isAudienceRunForLatestAudienceShape`, `latestAudienceRun`, `failedSyncsProviders`, `clawbacked`, `clawbackSource`, `isLive`, `lastAdPlatformSync`, `syncedDestinations`, `confirmedDestinations`, `confirmedShapeId`, `slackChannelId`, `slackAlertFrequency`, `syncsAudiences`, `hasDelayedRun`, `delayedRunSecondsRemaining`, `delayedRunTotalSeconds` } |
 | `400` | Invalid params or payload | array<{ `code`, `expected`, `received`, `path`, `message`, `options` }> |
 | `401` | Request doesn't have needed authentication parameters. Please check `Available authorizations` section here (symbol with lock on endpoint row) |  |
-| `403` | Authenticated user doesn't have access to Audience |  |
+| `403` | The organization has reached its plan's limit on audiences (or on exclusion audiences, for an exclusion audience). |  |
 | `404` | Audience not found | string |
 
 ### `POST /audiences/{audienceId}/shape`
@@ -186,7 +185,6 @@ Content-Type `application/json`: { `source_criteria`, `enrichments` }.
 | `200` | The updated audience and whether its estimate changed. | { `estimateUpdated`, `updatedAudience` } |
 | `400` | Invalid params or payload | array<{ `code`, `expected`, `received`, `path`, `message`, `options` }> |
 | `401` | Request doesn't have needed authentication parameters. Please check `Available authorizations` section here (symbol with lock on endpoint row) |  |
-| `403` | Authenticated user doesn't have access to Audience |  |
 | `404` | Audience not found | string |
 
 ### `POST /audiences/{audienceId}/run`
@@ -213,7 +211,7 @@ Content-Type `application/json`: { `confirm` }.
 | `200` | Audience built | { `id`, `name`, `status`, `subStatus`, `isFavorite`, `isArchived`, `archivedAt`, `mode`, `type`, `entity_type`, `shape`, `destinations`, `companies`, `people`, `lastUpdatedAt`, `submittedAt`, `hasError`, `errors`, `syncSettings`, `isAudienceRunForLatestAudienceShape`, `latestAudienceRun`, `failedSyncsProviders`, `clawbacked`, `clawbackSource`, `isLive`, `lastAdPlatformSync`, `syncedDestinations`, `confirmedDestinations`, `confirmedShapeId`, `slackChannelId`, `slackAlertFrequency`, `syncsAudiences`, `hasDelayedRun`, `delayedRunSecondsRemaining`, `delayedRunTotalSeconds` } |
 | `400` | Invalid params or payload | array<{ `code`, `expected`, `received`, `path`, `message`, `options` }> |
 | `401` | Request doesn't have needed authentication parameters. Please check `Available authorizations` section here (symbol with lock on endpoint row) |  |
-| `403` | Authenticated user doesn't have access to Audience |  |
+| `403` | The organization has reached its plan's limit on audiences (or on exclusion audiences, for an exclusion audience). |  |
 | `404` | Audience not found | string |
 
 ### `POST /audiences/{audienceId}/run/cancel`
@@ -237,7 +235,6 @@ None.
 | `204` | Audience run cancelled successfully |  |
 | `400` | Invalid params or payload | array<{ `code`, `expected`, `received`, `path`, `message`, `options` }> |
 | `401` | Request doesn't have needed authentication parameters. Please check `Available authorizations` section here (symbol with lock on endpoint row) |  |
-| `403` | Authenticated user doesn't have access to Audience |  |
 | `404` | Audience not found | string |
 | `409` | No pending run to cancel — it may have already started |  |
 
@@ -308,7 +305,6 @@ None.
 | --- | --- | --- |
 | `204` | No content successfully |  |
 | `401` | Request doesn't have needed authentication parameters. Please check `Available authorizations` section here (symbol with lock on endpoint row) |  |
-| `403` | Authenticated user doesn't have access to Audience |  |
 | `404` | Audience not found | string |
 
 ### `GET /filters/field-values`
@@ -319,7 +315,7 @@ Get the list of possible field values
 
 | In | Name | Required | Schema | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `query` | `fieldId` | yes | enum(`person_location`, `company_location`, `domain`, `industry`, `keywords`, `technologies`, `departments`, `job_title`, `seniority`, `annual_revenue`, `founded_year`, `headcount`, `csv`, `naics_code`, `skills`, `majors`, `degrees`, `last_seen`, `first_seen`, `last_form_submission`, `num_visits`, `session_time`, `num_form_fills`, `form_name`, `latest_page_url`, `referrer_domain`, `device_type`, `browser`, `utm_source`, `utm_medium`, `utm_term`, `utm_content`, `utm_campaign`, `first_utm_source`, `first_utm_medium`, `first_utm_campaign`, `first_utm_term`, `first_utm_content`, `all_utm_source`, `all_utm_medium`, `all_utm_campaign`, `all_utm_term`, `all_utm_content`, `first_page_url`, `all_pages_visited`, `intent_level`, `traffic_type`, `audience_membership`, `person_name`, `account_relationship`, `deal_name`, `deal_amount`, `deal_stage`, `deal_type`, `deal_is_closed`, `deal_is_won`, `deal_created_date`, `deal_close_date`) |  | Requested field identifier. |
+| `query` | `fieldId` | yes | enum(`person_location`, `company_location`, `domain`, `company_name`, `company_type`, `industry`, `keywords`, `technologies`, `departments`, `job_title`, `seniority`, `annual_revenue`, `founded_year`, `headcount`, `csv`, `naics_code`, `skills`, `majors`, `degrees`, `last_seen`, `first_seen`, `last_form_submission`, `num_visits`, `session_time`, `num_form_fills`, `form_name`, `latest_page_url`, `referrer_domain`, `device_type`, `browser`, `utm_source`, `utm_medium`, `utm_term`, `utm_content`, `utm_campaign`, `first_utm_source`, `first_utm_medium`, `first_utm_campaign`, `first_utm_term`, `first_utm_content`, `all_utm_source`, `all_utm_medium`, `all_utm_campaign`, `all_utm_term`, `all_utm_content`, `first_page_url`, `all_pages_visited`, `intent_level`, `traffic_type`, `audience_membership`, `person_name`, `account_relationship`, `deal_name`, `deal_amount`, `deal_stage`, `deal_type`, `deal_is_closed`, `deal_is_won`, `deal_created_date`, `deal_close_date`) |  | Requested field identifier. |
 | `query` | `q` | no | string | `""` | Query string. |
 | `query` | `limit` | no | integer | `250` | How many entries should be returned. |
 
@@ -349,7 +345,7 @@ None.
 Content-Type `application/json`: { `fieldId`, `values` }.
 | Field | Required | Schema | Default | Description |
 | --- | --- | --- | --- | --- |
-| `fieldId` | yes | enum(`person_location`, `company_location`, `domain`, `industry`, `keywords`, `technologies`, `departments`, `job_title`, `seniority`, `annual_revenue`, `founded_year`, `headcount`, `csv`, `naics_code`, `skills`, `majors`, `degrees`, `last_seen`, `first_seen`, `last_form_submission`, `num_visits`, `session_time`, `num_form_fills`, `form_name`, `latest_page_url`, `referrer_domain`, `device_type`, `browser`, `utm_source`, `utm_medium`, `utm_term`, `utm_content`, `utm_campaign`, `first_utm_source`, `first_utm_medium`, `first_utm_campaign`, `first_utm_term`, `first_utm_content`, `all_utm_source`, `all_utm_medium`, `all_utm_campaign`, `all_utm_term`, `all_utm_content`, `first_page_url`, `all_pages_visited`, `intent_level`, `traffic_type`, `audience_membership`, `person_name`, `account_relationship`, `deal_name`, `deal_amount`, `deal_stage`, `deal_type`, `deal_is_closed`, `deal_is_won`, `deal_created_date`, `deal_close_date`) |  | Requested field identifier. |
+| `fieldId` | yes | enum(`person_location`, `company_location`, `domain`, `company_name`, `company_type`, `industry`, `keywords`, `technologies`, `departments`, `job_title`, `seniority`, `annual_revenue`, `founded_year`, `headcount`, `csv`, `naics_code`, `skills`, `majors`, `degrees`, `last_seen`, `first_seen`, `last_form_submission`, `num_visits`, `session_time`, `num_form_fills`, `form_name`, `latest_page_url`, `referrer_domain`, `device_type`, `browser`, `utm_source`, `utm_medium`, `utm_term`, `utm_content`, `utm_campaign`, `first_utm_source`, `first_utm_medium`, `first_utm_campaign`, `first_utm_term`, `first_utm_content`, `all_utm_source`, `all_utm_medium`, `all_utm_campaign`, `all_utm_term`, `all_utm_content`, `first_page_url`, `all_pages_visited`, `intent_level`, `traffic_type`, `audience_membership`, `person_name`, `account_relationship`, `deal_name`, `deal_amount`, `deal_stage`, `deal_type`, `deal_is_closed`, `deal_is_won`, `deal_created_date`, `deal_close_date`) |  | Requested field identifier. |
 | `values` | yes | array<string> |  | The list of values to search for within the field's known values. |
 
 **Responses**
