@@ -465,13 +465,14 @@ Content-Type `application/json`: { `chatId` }.
 
 ### `DELETE /imported-datasets/{datasetId}`
 
-Delete imported dataset.
+Delete a dataset from any source. Its rows leave every audience and count, it leaves every list, and a later S3 file or API push with its name starts a new dataset. While audiences use it the call is refused with 409 `dataset_in_use`, naming them in `audiences`; repeat it with `confirm=true` to archive the active ones and remove the dataset from every audience's criteria. A dataset still importing is refused with 409, unless its import has made no progress for a day. Deleting a deleted dataset again succeeds.
 
 **Parameters**
 
 | In | Name | Required | Schema | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `path` | `datasetId` | yes | string |  | Dataset id |
+| `query` | `confirm` | no | enum(`true`, `false`) | `"false"` | Go ahead although audiences use the dataset: the active ones are archived and the dataset is removed from every audience's criteria. |
 
 **Request Body**
 
@@ -486,6 +487,7 @@ None.
 | `401` | Request doesn't have needed authentication parameters. Please check `Available authorizations` section here (symbol with lock on endpoint row) |  |
 | `403` | Authenticated user doesn't have access to Imported Dataset |  |
 | `404` | Imported Dataset not found | string |
+| `409` | Audiences use the dataset (`dataset_in_use`, JSON), or it can't be deleted right now: still importing, an audience running, another delete in progress (plain text). | { `code`, `message`, `audiences` } |
 
 ### `POST /ingest/people`
 
