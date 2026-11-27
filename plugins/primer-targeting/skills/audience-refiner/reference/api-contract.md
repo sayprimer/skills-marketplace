@@ -22,7 +22,8 @@ List the organization's audiences. Supports pagination (offset/limit), sorting (
 | In | Name | Required | Schema | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `query` | `offset` | no | string | `"0"` | Used for paginating. How many entries should be skipped. |
-| `query` | `limit` | no | string | `"50"` | Used for paginating. How many entries should be returned after the offset. |
+| `query` | `limit` | no | string | `"50"` | Used for paginating. How many entries should be returned after the offset, at most 500. |
+| `query` | `ids` | no | string |  | Comma-separated list of 1 to 1000 audience ids. Lists only those of the organization's audiences; the other filters still apply. |
 | `query` | `sort` | no | enum(`name`, `size`, `status`, `updated_at`, `created_by`, `created_at`) |  | Property name of the sorting. |
 | `query` | `order` | no | enum(`ASC`, `DESC`) |  | Order rule for the sorted property. |
 | `query` | `name` | no | string |  | Full or partial name of the search audience |
